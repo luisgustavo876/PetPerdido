@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "402394429890",
+    "project_id": "aula2904-335cb",
+    "storage_bucket": "aula2904-335cb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:402394429890:android:1a129596d863c8af9d7e5b",
+        "android_client_info": {
+          "package_name": "com.example.integracao_firebase"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCRN_t_d8XwruD_PB7WoFZW_4hwp_G7bGM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

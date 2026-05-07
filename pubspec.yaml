@@ -1,0 +1,40 @@
+name: petperdido
+description: Aplicativo de busca e localização de pets perdidos.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase (estrutural — lógica nas próximas iterações)
+  firebase_core: ^3.4.0
+  firebase_auth: ^5.2.0
+  cloud_firestore: ^5.4.0
+  firebase_storage: ^12.3.0
+
+  # Mapa (placeholder preparado para Maps)
+  google_maps_flutter: ^2.5.3
+
+  # Imagens
+  image_picker: ^1.0.7
+  cached_network_image: ^3.3.1
+
+  # Utilitários
+  intl: ^0.19.0
+  uuid: ^4.3.3
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
