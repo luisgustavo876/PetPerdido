@@ -69,6 +69,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: '402394429890',
     projectId: 'aula2904-335cb',
     storageBucket: 'aula2904-335cb.firebasestorage.app',
-    iosBundleId: 'com.example.integracaoFirebase',
+    iosBundleId: 'com.luisg.petperdido',
   );
 }

@@ -1,4 +1,4 @@
-package com.example.integracao_firebase;
+package com.luisg.petperdido;
 
 import io.flutter.embedding.android.FlutterActivity;
 

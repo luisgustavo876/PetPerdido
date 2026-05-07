@@ -1,6 +1,6 @@
 {
-    "name": "integracao_firebase",
-    "short_name": "integracao_firebase",
+    "name": "PetPerdido",
+    "short_name": "PetPerdido",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

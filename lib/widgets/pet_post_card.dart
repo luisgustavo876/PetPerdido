@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../models/post_model.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 /// Card de postagem que aparece no Feed e no Mapa do PetPerdido.
 ///
@@ -75,12 +76,13 @@ class PetPostCard extends StatelessWidget {
               width: double.infinity,
               fit: BoxFit.cover,
             )
-          : Image.network(
-              post.photoUrl!,
+          : CachedNetworkImage(
+              imageUrl: post.photoUrl!,
               height: 200,
               width: double.infinity,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _imagePlaceholder(),
+              placeholder: (_, __) => _imagePlaceholder(),
+              errorWidget: (_, __, ___) => _imagePlaceholder(),
             ),
     );
   }
@@ -132,9 +134,11 @@ class PetPostCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: _badgeColor.withValues(alpha: 0.15),
+        // ignore: deprecated_member_use
+        color: _badgeColor.withOpacity(0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _badgeColor.withValues(alpha: 0.4)),
+        // ignore: deprecated_member_use
+        border: Border.all(color: _badgeColor.withOpacity(0.4)),
       ),
       child: Text(
         post.type.label,
