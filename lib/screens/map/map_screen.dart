@@ -4,7 +4,7 @@ import '../../core/app_colors.dart';
 import '../../core/app_constants.dart';
 import '../../core/app_routes.dart';
 import '../../models/post_model.dart';
-import '../../models/app_state.dart';
+import '../../services/post_service.dart';
 import '../feed/detail_screen.dart';
 
 class MapScreen extends StatefulWidget {
@@ -16,7 +16,6 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   GoogleMapController? _mapController;
-  final AppState _appState = AppState();
 
   static const CameraPosition _initialPosition = CameraPosition(
     target: LatLng(AppConstants.defaultLat, AppConstants.defaultLng),
@@ -63,10 +62,13 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: ListenableBuilder(
-        listenable: _appState,
-        builder: (context, _) {
-          final posts = _appState.posts;
+      body: StreamBuilder<List<PostModel>>(
+        stream: PostService.postsStream(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final posts = snapshot.data ?? [];
           final markers = _buildMarkers(posts);
           final lostCount = posts.where((p) => p.type == PostType.lost).length;
 

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/app_colors.dart';
-import '../models/app_state.dart';
 import 'map/map_screen.dart';
 import 'feed/feed_screen.dart';
 import 'profile/points_screen.dart';
@@ -17,7 +16,6 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
-  final AppState _appState = AppState();
 
   final List<Widget> _screens = const [
     MapScreen(),
@@ -28,18 +26,13 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: _appState,
-      builder: (context, _) {
-        return Scaffold(
-          appBar: _buildAppBar(),
-          body: IndexedStack(
-            index: _currentIndex,
-            children: _screens,
-          ),
-          bottomNavigationBar: _buildNavBar(),
-        );
-      },
+    return Scaffold(
+      appBar: _buildAppBar(),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
+      bottomNavigationBar: _buildNavBar(),
     );
   }
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
-import '../../models/app_state.dart';
+import '../../core/dados_globais.dart';
+import '../../models/post_model.dart';
+import '../../services/post_service.dart';
 import 'chat_screen.dart';
 
 class ChatsScreen extends StatefulWidget {
@@ -11,7 +13,6 @@ class ChatsScreen extends StatefulWidget {
 }
 
 class _ChatsScreenState extends State<ChatsScreen> {
-  final AppState _appState = AppState();
 
   @override
   Widget build(BuildContext context) {
@@ -26,12 +27,13 @@ class _ChatsScreenState extends State<ChatsScreen> {
           child: Container(color: Colors.grey[200], height: 1),
         ),
       ),
-      body: ListenableBuilder(
-        listenable: _appState,
-        builder: (context, _) {
+      body: StreamBuilder<List<PostModel>>(
+        stream: PostService.postsStream(),
+        builder: (context, snapshot) {
+          final posts = snapshot.data ?? [];
           // Filtrar os posts que possuem histórico de chat
-          final chatPosts = _appState.posts.where((post) {
-            return _appState.chats.containsKey(post.id);
+          final chatPosts = posts.where((post) {
+            return DadosGlobais.chats.containsKey(post.id);
           }).toList();
 
           if (chatPosts.isEmpty) {
@@ -56,7 +58,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
             separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF0F0F0)),
             itemBuilder: (context, index) {
               final post = chatPosts[index];
-              final messages = _appState.chats[post.id] ?? [];
+              final messages = DadosGlobais.chats[post.id] ?? [];
               final hasMessages = messages.isNotEmpty;
 
               final lastMsg = hasMessages ? messages.last['message'] as String : 'Nenhuma mensagem';

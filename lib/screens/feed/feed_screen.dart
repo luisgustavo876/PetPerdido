@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_colors.dart';
 import '../../models/post_model.dart';
-import '../../models/app_state.dart';
+import '../../models/post_model.dart';
+import '../../services/post_service.dart';
 import '../../widgets/pet_post_card.dart';
 import 'detail_screen.dart';
 
@@ -14,7 +15,6 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
-  final AppState _appState = AppState();
   String _searchQuery = '';
   String _activeFilter = 'todos';
 
@@ -47,10 +47,18 @@ class _FeedScreenState extends State<FeedScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: ListenableBuilder(
-        listenable: _appState,
-        builder: (context, _) {
-          final filteredPosts = _getFilteredPosts(_appState.posts);
+      body: StreamBuilder<List<PostModel>>(
+        stream: PostService.postsStream(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return const Center(child: Text('Erro ao carregar os posts.'));
+          }
+
+          final posts = snapshot.data ?? [];
+          final filteredPosts = _getFilteredPosts(posts);
 
           return Column(
             children: [

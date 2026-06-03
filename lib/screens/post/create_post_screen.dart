@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/app_colors.dart';
 import '../../models/post_model.dart';
-import '../../models/app_state.dart';
 import '../../services/auth_service.dart';
 import '../../services/storage_service.dart';
 
@@ -15,7 +14,6 @@ class CreatePostScreen extends StatefulWidget {
 }
 
 class _CreatePostScreenState extends State<CreatePostScreen> {
-  final AppState _appState = AppState();
   final _formKey = GlobalKey<FormState>();
 
   int _currentStep = 1;
@@ -130,7 +128,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       traits: _selectedTraits.toList(),
     );
 
-    await _appState.addPost(newPost);
+    await PostService.createPost(newPost);
 
     setState(() => _isLoading = false);
 

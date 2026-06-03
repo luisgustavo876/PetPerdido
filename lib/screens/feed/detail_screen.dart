@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_colors.dart';
 import '../../models/post_model.dart';
-import '../../models/app_state.dart';
+import '../../core/dados_globais.dart';
+import '../../services/post_service.dart';
 import '../chat/chat_screen.dart';
 
 class DetailScreen extends StatefulWidget {
@@ -15,44 +16,42 @@ class DetailScreen extends StatefulWidget {
 }
 
 class _DetailScreenState extends State<DetailScreen> {
-  final AppState _appState = AppState();
+  late PostModel _currentPost;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPost = widget.post;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: _appState,
-      builder: (context, _) {
-        final currentPost = _appState.posts.firstWhere(
-          (p) => p.id == widget.post.id,
-          orElse: () => widget.post,
-        );
-
-        return Scaffold(
+    return Scaffold(
           backgroundColor: AppColors.surface,
           body: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHero(context, currentPost),
+                _buildHero(context, _currentPost),
                 Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildHeader(currentPost),
+                      _buildHeader(_currentPost),
                       const SizedBox(height: 20),
-                      _buildSpecGrid(currentPost),
+                      _buildSpecGrid(_currentPost),
                       const SizedBox(height: 24),
-                      if (currentPost.traits.isNotEmpty) ...[
+                      if (_currentPost.traits.isNotEmpty) ...[
                         _sectionTitle('Características'),
                         const SizedBox(height: 10),
-                        _buildTraits(currentPost),
+                        _buildTraits(_currentPost),
                         const SizedBox(height: 24),
                       ],
                       _sectionTitle('Descrição'),
                       const SizedBox(height: 10),
                       Text(
-                        currentPost.description,
+                        _currentPost.description,
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           height: 1.6,
@@ -62,12 +61,12 @@ class _DetailScreenState extends State<DetailScreen> {
                       const SizedBox(height: 28),
                       _sectionTitle('Tutor'),
                       const SizedBox(height: 10),
-                      _buildTutorCard(context, currentPost),
+                      _buildTutorCard(context, _currentPost),
                       const SizedBox(height: 28),
                       _sectionTitle(
-                          'Avistamentos (${currentPost.sightingsCount})'),
+                          'Avistamentos (${_currentPost.sightingsCount})'),
                       const SizedBox(height: 12),
-                      _buildTimeline(currentPost),
+                      _buildTimeline(_currentPost),
                       const SizedBox(height: 48),
                     ],
                   ),
@@ -75,10 +74,8 @@ class _DetailScreenState extends State<DetailScreen> {
               ],
             ),
           ),
-          bottomNavigationBar: _buildActions(context, currentPost),
+          bottomNavigationBar: _buildActions(context, _currentPost),
         );
-      },
-    );
   }
 
   Widget _sectionTitle(String title) {
@@ -672,7 +669,17 @@ class _DetailScreenState extends State<DetailScreen> {
                         );
                         return;
                       }
-                      _appState.addSighting(post.id);
+                      
+                      // Chama o PostService diretamente
+                      PostService.incrementSighting(post.id);
+                      DadosGlobais.pontosUsuario += 15;
+                      
+                      setState(() {
+                        _currentPost = _currentPost.copyWith(
+                          sightingsCount: _currentPost.sightingsCount + 1,
+                        );
+                      });
+
                       Navigator.pop(context);
                       _showSuccessDialog(context);
                     },

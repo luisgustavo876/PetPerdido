@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
-import '../../models/app_state.dart';
+import '../../core/dados_globais.dart';
 import '../../models/post_model.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -13,7 +13,6 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final AppState _appState = AppState();
   final TextEditingController _msgController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -45,28 +44,31 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _msgController.text.trim();
     if (text.isEmpty && photoUrl == null) return;
 
-    _appState.addMessage(
-      widget.post.id,
-      'myUser',
-      'Você',
-      text,
-      photoUrl: photoUrl,
-    );
+    setState(() {
+      DadosGlobais.adicionarMensagem(
+        widget.post.id,
+        'myUser',
+        'Você',
+        text,
+      );
+    });
 
     _msgController.clear();
     // Forçar rolagem para baixo
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
 
     // Simulação rápida de resposta do tutor após 1.5 segundos (se for o primeiro contato)
-    if (widget.post.id == '3' && (_appState.chats[widget.post.id]?.length ?? 0) == 1) {
+    if (widget.post.id == '3' && (DadosGlobais.chats[widget.post.id]?.length ?? 0) == 1) {
       Future.delayed(const Duration(milliseconds: 1500), () {
         if (mounted) {
-          _appState.addMessage(
-            widget.post.id,
-            widget.post.userId,
-            widget.post.userName,
-            'Muito obrigado pelo contato! Onde exatamente você encontrou ele?',
-          );
+          setState(() {
+            DadosGlobais.adicionarMensagem(
+              widget.post.id,
+              widget.post.userId,
+              widget.post.userName,
+              'Muito obrigado pelo contato! Onde exatamente você encontrou ele?',
+            );
+          });
           WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
         }
       });
@@ -147,31 +149,43 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Container(color: AppColors.divider, height: 1),
         ),
       ),
-      body: ListenableBuilder(
-        listenable: _appState,
-        builder: (context, _) {
-          final messages = _appState.chats[widget.post.id] ?? [];
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: Builder(
+                builder: (context) {
+                  final messages = DadosGlobais.chats[widget.post.id] ?? [];
 
-          return Column(
-            children: [
-              Expanded(
-                child: messages.isEmpty
-                    ? _buildWelcomeMessage()
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: messages.length,
-                        itemBuilder: (context, index) {
-                          final msg = messages[index];
-                          final isMe = msg['senderId'] == 'myUser';
-                          return _buildMessageBubble(msg, isMe);
-                        },
-                      ),
+                  if (messages.isEmpty) {
+                    return _buildWelcomeMessage();
+                  }
+                  return ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final msg = messages[index];
+                      final isMe = msg['senderId'] == 'myUser';
+                      final showAvatar = !isMe &&
+                          (index == messages.length - 1 ||
+                              messages[index + 1]['senderId'] != msg['senderId']);
+
+                      return _buildMessageBubble(
+                        text: msg['message'],
+                        isMe: isMe,
+                        time: msg['createdAt'],
+                        photo: msg['photoUrl'],
+                        showAvatar: showAvatar,
+                      );
+                    },
+                  );
+                },
               ),
-              _buildInputArea(context),
-            ],
-          );
-        },
+            ),
+            _buildInputArea(),
+          ],
+        ),
       ),
     );
   }

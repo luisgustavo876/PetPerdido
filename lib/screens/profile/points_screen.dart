@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_colors.dart';
-import '../../models/app_state.dart';
+import '../../core/dados_globais.dart';
 
 /// Tela de Pontos e Recompensas.
 /// Versão simplificada para o protótipo do TCC.
-class PointsScreen extends StatelessWidget {
+class PointsScreen extends StatefulWidget {
   const PointsScreen({super.key});
+
+  @override
+  State<PointsScreen> createState() => _PointsScreenState();
+}
+
+class _PointsScreenState extends State<PointsScreen> {
 
   // Lista de recompensas disponíveis
   static const List<Map<String, dynamic>> _rewards = [
@@ -50,15 +56,10 @@ class PointsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final appState = AppState();
+    final points = DadosGlobais.pontosUsuario;
+    final redeemed = DadosGlobais.recompensasResgatadas;
 
-    return ListenableBuilder(
-      listenable: appState,
-      builder: (context, _) {
-        final points = appState.userPoints;
-        final redeemed = appState.redeemedRewards;
-
-        return SingleChildScrollView(
+    return SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -101,12 +102,12 @@ class PointsScreen extends StatelessWidget {
                 ),
                 itemCount: _rewards.length,
                 itemBuilder: (context, index) {
+                  final reward = _rewards[index];
+                  final isRedeemed = redeemed.contains(reward['id']);
                   return _buildRewardCard(
                     context,
-                    _rewards[index],
-                    points,
-                    redeemed,
-                    appState,
+                    reward,
+                    isRedeemed,
                   );
                 },
               ),
@@ -114,8 +115,6 @@ class PointsScreen extends StatelessWidget {
             ],
           ),
         );
-      },
-    );
   }
 
   Widget _buildPointsCard(int points) {
@@ -266,14 +265,10 @@ class PointsScreen extends StatelessWidget {
   Widget _buildRewardCard(
     BuildContext context,
     Map<String, dynamic> reward,
-    int points,
-    List<String> redeemed,
-    AppState appState,
+    bool isRedeemed,
   ) {
-    final id = reward['id'] as String;
     final cost = reward['points'] as int;
-    final isRedeemed = redeemed.contains(id);
-    final canRedeem = points >= cost && !isRedeemed;
+    final canRedeem = DadosGlobais.pontosUsuario >= cost && !isRedeemed;
     final color = reward['color'] as Color;
     final surface = reward['surface'] as Color;
 
@@ -343,8 +338,13 @@ class PointsScreen extends StatelessWidget {
                 ),
                 GestureDetector(
                   onTap: canRedeem
-                      ? () => _redeem(
-                          context, id, reward['title'] as String, cost, appState)
+                      ? () {
+                          if (DadosGlobais.resgatarRecompensa(
+                                reward['id'], reward['points'])) {
+                              setState(() {}); // Atualiza a tela
+                              _showSuccessDialog(context, reward['title']);
+                            }
+                        }
                       : null,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
@@ -379,11 +379,7 @@ class PointsScreen extends StatelessWidget {
     );
   }
 
-  void _redeem(BuildContext context, String id, String title, int cost,
-      AppState appState) {
-    final success = appState.redeemReward(id, cost);
-    if (!success) return;
-
+  void _showSuccessDialog(BuildContext context, String title) {
     showDialog(
       context: context,
       barrierDismissible: false,

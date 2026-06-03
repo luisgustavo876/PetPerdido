@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'core/app_routes.dart';
 import 'core/app_theme.dart';
 import 'firebase_options.dart';
-import 'models/app_state.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/main_screen.dart';
 
@@ -46,8 +45,7 @@ class _AuthGate extends StatelessWidget {
         }
 
         if (snapshot.data != null) {
-          // Usuário logado — inicia stream de posts
-          AppState().initPostsStream();
+          // Usuário logado
           return const MainScreen();
         }
 
