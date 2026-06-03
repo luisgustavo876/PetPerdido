@@ -1,25 +1,26 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'post_model.dart';
+import '../services/post_service.dart';
 
-/// Gerenciador de Estado Global Simulado para o PetPerdido.
-/// Singleton reativo que propaga atualizações de dados instantaneamente para toda a interface.
 class AppState extends ChangeNotifier {
   static final AppState _instance = AppState._internal();
   factory AppState() => _instance;
 
+  StreamSubscription<List<PostModel>>? _postsSub;
+
   AppState._internal() {
-    // Inicialização do histórico de mensagens para os chats mockados
     _chats = {
       '1': [
         {
-          'senderId': 'user1', // Tutor (Carol)
+          'senderId': 'user1',
           'senderName': 'Carol Mendes',
-          'message': 'Olá! Alguém viu a Laura perto da pracinha da Vila Barth?',
+          'message': 'Alguém viu a Laura perto da pracinha da Vila Barth?',
           'createdAt': DateTime.now().subtract(const Duration(hours: 1)),
           'photoUrl': null,
         },
         {
-          'senderId': 'myUser', // Usuário Logado
+          'senderId': 'myUser',
           'senderName': 'Você',
           'message': 'Eu passei por lá mais cedo, vou ficar atento!',
           'createdAt': DateTime.now().subtract(const Duration(minutes: 40)),
@@ -28,9 +29,9 @@ class AppState extends ChangeNotifier {
       ],
       '2': [
         {
-          'senderId': 'user2', // Danilo
+          'senderId': 'user2',
           'senderName': 'Danilo Ramos',
-          'message': 'Oi! O Rex estava correndo assustado perto do Jardim Marabá.',
+          'message': 'O Rex estava correndo assustado perto do Jardim Marabá.',
           'createdAt': DateTime.now().subtract(const Duration(minutes: 10)),
           'photoUrl': null,
         }
@@ -39,34 +40,57 @@ class AppState extends ChangeNotifier {
     };
   }
 
-  // Lista dinâmica de postagens
-  final List<PostModel> _posts = List.from(mockPosts);
+  List<PostModel> _posts = List.from(mockPosts);
   List<PostModel> get posts => List.unmodifiable(_posts);
 
-  // Saldo de pontos inicializado em 320
+  bool _loadingPosts = false;
+  bool get loadingPosts => _loadingPosts;
+
   int _userPoints = 320;
   int get userPoints => _userPoints;
 
-  // Prêmios resgatados pelo usuário
   final List<String> _redeemedRewards = [];
   List<String> get redeemedRewards => List.unmodifiable(_redeemedRewards);
 
-  // Histórico de chats estruturado por postId
   late final Map<String, List<Map<String, dynamic>>> _chats;
   Map<String, List<Map<String, dynamic>>> get chats => _chats;
 
-  /// Adiciona uma nova postagem ao estado global
-  void addPost(PostModel post) {
-    _posts.insert(0, post);
-    _chats[post.id] = [];
+  // Conecta ao Firestore e substitui os posts em tempo real
+  void initPostsStream() {
+    if (_postsSub != null) return; // já está ouvindo
+    _loadingPosts = true;
     notifyListeners();
+
+    _postsSub = PostService.postsStream().listen(
+      (firestorePosts) {
+        _posts = firestorePosts;
+        _loadingPosts = false;
+        for (final post in firestorePosts) {
+          _chats.putIfAbsent(post.id, () => []);
+        }
+        notifyListeners();
+      },
+      onError: (_) {
+        // Mantém mockPosts se Firestore falhar
+        _loadingPosts = false;
+        notifyListeners();
+      },
+    );
   }
 
-  /// Adiciona uma mensagem à conversa de um post específico
-  void addMessage(String postId, String senderId, String senderName, String message, {String? photoUrl}) {
-    if (!_chats.containsKey(postId)) {
-      _chats[postId] = [];
-    }
+  void cancelPostsStream() {
+    _postsSub?.cancel();
+    _postsSub = null;
+  }
+
+  Future<void> addPost(PostModel post) async {
+    await PostService.createPost(post);
+    // Stream atualiza _posts automaticamente
+  }
+
+  void addMessage(String postId, String senderId, String senderName,
+      String message, {String? photoUrl}) {
+    _chats.putIfAbsent(postId, () => []);
     _chats[postId]!.add({
       'senderId': senderId,
       'senderName': senderName,
@@ -77,7 +101,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Tenta resgatar uma recompensa deduzindo os pontos do saldo
   bool redeemReward(String rewardId, int cost) {
     if (_userPoints >= cost && !_redeemedRewards.contains(rewardId)) {
       _userPoints -= cost;
@@ -88,8 +111,8 @@ class AppState extends ChangeNotifier {
     return false;
   }
 
-  /// Adiciona um avistamento a uma postagem e bonifica o usuário com 15 pontos
   void addSighting(String postId) {
+    // Atualização otimista local
     final index = _posts.indexWhere((p) => p.id == postId);
     if (index != -1) {
       final post = _posts[index];
@@ -97,8 +120,10 @@ class AppState extends ChangeNotifier {
         sightingsCount: post.sightingsCount + 1,
         helpersCount: post.helpersCount + 1,
       );
-      _userPoints += 15; // Recompensa de 15 pontos
+      _userPoints += 15;
       notifyListeners();
     }
+    // Persiste no Firestore em background
+    PostService.incrementSighting(postId);
   }
 }

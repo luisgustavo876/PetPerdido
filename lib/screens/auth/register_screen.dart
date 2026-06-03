@@ -1,12 +1,12 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_colors.dart';
-import '../../core/app_routes.dart';
+import '../../services/auth_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 
-/// Tela de Cadastro.
-/// Esqueleto visual — lógica Firebase nas próximas iterações.
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -20,7 +20,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _cpfController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final _confirmController = TextEditingController();
   bool _isLoading = false;
 
   @override
@@ -29,56 +29,92 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _cpfController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    _confirmController.dispose();
     super.dispose();
   }
 
   Future<void> _onRegister() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
 
-    // TODO: Implementar Firebase Auth + Firestore nas próximas iterações
-    await Future.delayed(const Duration(seconds: 1));
-
-    if (mounted) {
+    try {
+      await AuthService.register(
+        name: _nameController.text,
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+      // Roteamento via authStateChanges no main.dart
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
-      Navigator.pushReplacementNamed(context, AppRoutes.main);
+      final msg = switch (e.code) {
+        'email-already-in-use' => 'Este e-mail já está cadastrado.',
+        'weak-password' => 'Senha muito fraca.',
+        'invalid-email' => 'E-mail inválido.',
+        _ => 'Erro ao cadastrar. Tente novamente.',
+      };
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(msg)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erro inesperado. Tente novamente.')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.surface,
       appBar: AppBar(
-        title: const Text('Criar Conta'),
-        leading: const BackButton(),
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back,
+              color: AppColors.onSurface, size: 22),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Criar conta',
+          style: GoogleFonts.inter(
+            color: AppColors.onSurface,
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: AppColors.divider, height: 1),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 28),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Preencha seus dados',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                Text(
+                  'Seus dados',
+                  style: GoogleFonts.inter(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
                     color: AppColors.onSurface,
+                    letterSpacing: -0.5,
                   ),
                 ),
-                const SizedBox(height: 4),
-                const Text(
+                const SizedBox(height: 6),
+                Text(
                   'Você precisa ter ao menos 16 anos para se cadastrar.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
+                  style: GoogleFonts.inter(
+                      fontSize: 14, color: AppColors.textSecondary),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 36),
+
                 CustomTextField(
                   label: 'Nome completo',
                   controller: _nameController,
@@ -87,7 +123,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   validator: (v) =>
                       (v == null || v.trim().length < 3) ? 'Nome inválido' : null,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 CustomTextField(
                   label: 'E-mail',
                   controller: _emailController,
@@ -99,7 +135,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 CustomTextField(
                   label: 'CPF',
                   hint: '000.000.000-00',
@@ -110,12 +146,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     FilteringTextInputFormatter.digitsOnly,
                     LengthLimitingTextInputFormatter(11),
                   ],
-                  validator: (v) {
-                    if (v == null || v.length != 11) return 'CPF inválido';
-                    return null;
-                  },
+                  validator: (v) =>
+                      (v == null || v.length != 11) ? 'CPF inválido' : null,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 CustomTextField(
                   label: 'Senha',
                   controller: _passwordController,
@@ -123,36 +157,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   isPassword: true,
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Informe a senha';
-                    if (v.length < 10) return 'Mínimo de 10 caracteres';
-                    if (!v.contains(RegExp(r'[0-9]'))) {
-                      return 'Inclua ao menos um número';
-                    }
-                    if (!v.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) {
-                      return 'Inclua ao menos um símbolo';
-                    }
+                    if (v.length < 6) return 'Mínimo de 6 caracteres';
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 CustomTextField(
                   label: 'Confirmar senha',
-                  controller: _confirmPasswordController,
+                  controller: _confirmController,
                   prefixIcon: Icons.lock_outline,
                   isPassword: true,
-                  validator: (v) {
-                    if (v != _passwordController.text) {
-                      return 'As senhas não coincidem';
-                    }
-                    return null;
-                  },
+                  validator: (v) => v != _passwordController.text
+                      ? 'As senhas não coincidem'
+                      : null,
                 ),
-                const SizedBox(height: 32),
+
+                const SizedBox(height: 36),
+
                 CustomButton(
                   label: 'Criar Conta',
                   onPressed: _onRegister,
                   isLoading: _isLoading,
-                  icon: Icons.check_circle_outline,
                 ),
+
+                const SizedBox(height: 24),
+
+                Center(
+                  child: Text(
+                    'Ao criar sua conta, você concorda com nossos\nTermos de Uso e Política de Privacidade.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: AppColors.textTertiary,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 32),
               ],
             ),
           ),

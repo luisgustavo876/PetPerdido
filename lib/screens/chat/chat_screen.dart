@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../models/app_state.dart';
 import '../../models/post_model.dart';
-import 'dart:io';
 
 class ChatScreen extends StatefulWidget {
   final PostModel post;
@@ -77,11 +76,12 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7F8),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         foregroundColor: AppColors.onSurface,
         elevation: 0,
+        scrolledUnderElevation: 0,
         leadingWidth: 48,
         titleSpacing: 0,
         title: Row(
@@ -144,7 +144,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(color: Colors.grey[200], height: 1),
+          child: Container(color: AppColors.divider, height: 1),
         ),
       ),
       body: ListenableBuilder(
@@ -306,9 +306,9 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildInputArea(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey[200]!)),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.divider)),
       ),
       child: SafeArea(
         child: Row(
@@ -322,9 +322,9 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  color: Colors.grey[50],
+                  color: AppColors.background,
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.grey[200]!),
+                  border: Border.all(color: AppColors.divider),
                 ),
                 child: TextField(
                   controller: _msgController,

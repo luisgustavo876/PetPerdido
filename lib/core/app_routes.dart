@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/main_screen.dart';
 import '../screens/post/create_post_screen.dart';
@@ -14,7 +13,6 @@ class AppRoutes {
   static const String createPost = '/create-post';
 
   static Map<String, WidgetBuilder> get routes => {
-        login: (_) => const LoginScreen(),
         register: (_) => const RegisterScreen(),
         main: (_) => const MainScreen(),
         createPost: (_) => const CreatePostScreen(),

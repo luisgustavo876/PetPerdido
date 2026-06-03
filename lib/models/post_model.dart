@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/app_constants.dart';
 
 /// Enum representando os tipos de postagem.
@@ -159,7 +160,9 @@ class PostModel {
       latitude: (map['latitude'] as num).toDouble(),
       longitude: (map['longitude'] as num).toDouble(),
       photoUrl: map['photoUrl'] as String?,
-      createdAt: DateTime.parse(map['createdAt'] as String),
+      createdAt: map['createdAt'] is Timestamp
+          ? (map['createdAt'] as Timestamp).toDate()
+          : DateTime.parse(map['createdAt'] as String),
       isResolved: map['isResolved'] as bool? ?? false,
       breed: map['breed'] as String? ?? 'Desconhecida',
       species: map['species'] as String? ?? 'Cão',

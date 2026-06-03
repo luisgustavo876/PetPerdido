@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_colors.dart';
 import '../../models/post_model.dart';
 import '../../models/app_state.dart';
 import '../../widgets/pet_post_card.dart';
 import 'detail_screen.dart';
-import '../chat/chat_screen.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -16,12 +16,11 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> {
   final AppState _appState = AppState();
   String _searchQuery = '';
-  String _activeFilter = 'todos'; // todos, lost, sighted, found
+  String _activeFilter = 'todos';
 
   List<PostModel> _getFilteredPosts(List<PostModel> posts) {
     var list = posts;
 
-    // Filtrar por aba
     if (_activeFilter == 'lost') {
       list = list.where((p) => p.type == PostType.lost).toList();
     } else if (_activeFilter == 'sighted') {
@@ -30,7 +29,6 @@ class _FeedScreenState extends State<FeedScreen> {
       list = list.where((p) => p.type == PostType.found).toList();
     }
 
-    // Filtrar por busca
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
       list = list.where((p) {
@@ -48,42 +46,37 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: AppColors.background,
       body: ListenableBuilder(
         listenable: _appState,
         builder: (context, _) {
-          final posts = _appState.posts;
-          final filteredPosts = _getFilteredPosts(posts);
+          final filteredPosts = _getFilteredPosts(_appState.posts);
 
           return Column(
             children: [
-              _buildSearchHeader(),
-              _buildFilterChips(),
+              _buildSearchSection(),
               Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.only(bottom: 24),
-                  children: [
-                    // Banner de Match de Inteligência Artificial
-                    _buildIaMatchBanner(context),
-                    
-                    if (filteredPosts.isEmpty)
-                      _buildEmptyState()
-                    else
-                      ...filteredPosts.map((post) {
-                        return PetPostCard(
-                          post: post,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => DetailScreen(post: post),
-                              ),
-                            );
-                          },
-                        );
-                      }),
-                  ],
-                ),
+                child: filteredPosts.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                        padding: const EdgeInsets.only(top: 8, bottom: 32),
+                        itemCount: filteredPosts.length,
+                        itemBuilder: (context, index) {
+                          return PetPostCard(
+                            post: filteredPosts[index],
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => DetailScreen(
+                                    post: filteredPosts[index],
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
               ),
             ],
           );
@@ -92,400 +85,201 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Widget _buildSearchHeader() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[200]!),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.search, color: Colors.grey, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      decoration: const InputDecoration(
-                        hintText: 'Buscar raça, cor, características...',
-                        border: InputBorder.none,
-                        isDense: true,
-                        hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
-                      ),
-                      onChanged: (val) {
-                        setState(() => _searchQuery = val);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Container(
-            height: 44,
-            width: 44,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.primary.withOpacity(0.15)),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.tune, color: AppColors.primary, size: 18),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Filtros avançados (distância, espécie)...')),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChips() {
+  Widget _buildSearchSection() {
     final filters = [
-      {'id': 'todos', 'label': 'Todos os Pets'},
+      {'id': 'todos', 'label': 'Todos'},
       {'id': 'lost', 'label': 'Perdidos'},
       {'id': 'sighted', 'label': 'Avistados'},
       {'id': 'found', 'label': 'Achados'},
     ];
 
     return Container(
-      height: 46,
-      color: Colors.white,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        itemCount: filters.length,
-        itemBuilder: (context, index) {
-          final filter = filters[index];
-          final id = filter['id'] as String;
-          final isSelected = _activeFilter == id;
-
-          return Container(
-            margin: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(
-                filter['label'] as String,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.black87,
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      color: AppColors.surface,
+      child: Column(
+        children: [
+          // Search bar no estilo Inter
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(26),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 16),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.search,
+                            color: AppColors.primary,
+                            size: 16,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: AppColors.onSurface,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Buscar pets próximos...',
+                              hintStyle: GoogleFonts.inter(
+                                fontSize: 14,
+                                color: AppColors.textTertiary,
+                              ),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                              fillColor: Colors.transparent,
+                              filled: false,
+                            ),
+                            onChanged: (val) =>
+                                setState(() => _searchQuery = val),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              selected: isSelected,
-              selectedColor: AppColors.primary,
-              backgroundColor: Colors.grey[50],
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              side: BorderSide(color: isSelected ? AppColors.primary : Colors.grey[200]!),
-              showCheckmark: false,
-              onSelected: (val) {
-                if (val) {
-                  setState(() => _activeFilter = id);
-                }
+                const SizedBox(width: 10),
+                // Botão de filtro avançado
+                GestureDetector(
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Filtros avançados em breve')),
+                    );
+                  },
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(26),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.tune_rounded,
+                      color: AppColors.textSecondary,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Filtros por categoria
+          SizedBox(
+            height: 40,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              itemCount: filters.length,
+              itemBuilder: (context, index) {
+                final filter = filters[index];
+                final id = filter['id']!;
+                final isSelected = _activeFilter == id;
+
+                return GestureDetector(
+                  onTap: () => setState(() => _activeFilter = id),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primary : Colors.transparent,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.divider,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      filter['label']!,
+                      style: GoogleFonts.inter(
+                        color: isSelected
+                            ? Colors.white
+                            : AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                );
               },
             ),
-          );
-        },
-      ),
-    );
-  }
+          ),
 
-  Widget _buildIaMatchBanner(BuildContext context) {
-    // Apenas mostrar se estivermos na aba geral ou perdidos, simulando o match da Laura
-    if (_activeFilter != 'todos' && _activeFilter != 'lost') return const SizedBox.shrink();
-
-    return GestureDetector(
-      onTap: () => _showIaMatchDialog(context),
-      child: Container(
-        margin: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 6),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF2E7D32), // Verde Floresta Premium
-              Color(0xFF4CAF50),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.green.withOpacity(0.2),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            )
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.psychology_outlined,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 14),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'RECONHECIMENTO DE IA ACTIVO',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 9,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    '2 novos matches possíveis para Laura!',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Nossa IA encontrou semelhanças em avistamentos.',
-                    style: TextStyle(color: Color(0xE6FFFFFF), fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right,
-              color: Colors.white,
-              size: 24,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Container(
-      padding: const EdgeInsets.all(40),
-      alignment: Alignment.center,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.search_off, size: 48, color: Colors.grey[400]),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Nenhum pet encontrado',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.onSurface),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Experimente buscar por outros termos ou alterar os filtros ativos.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey, fontSize: 12),
-          ),
+          // Linha divisória
+          Container(height: 1, color: AppColors.divider),
         ],
       ),
     );
   }
 
-  void _showIaMatchDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Ícone e Título
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.green[50],
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.psychology, color: Colors.green, size: 20),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Match Inteligente de IA',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Comparamos os traços e fotos de Laura com avistamentos próximos em Itapetininga e encontramos alta compatibilidade!',
-                  style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
-                ),
-                const SizedBox(height: 20),
-
-                // Comparativo Lado a Lado
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.asset('assets/images/cat-laura.jpg', height: 100, width: double.infinity, fit: BoxFit.cover),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text('Gata Laura', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                          const Text('Seu Pet', style: TextStyle(fontSize: 9, color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        '86%',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.asset('assets/images/dog_sighted.png', height: 100, width: double.infinity, fit: BoxFit.cover),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text('Gata avistada', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                          const Text('No Jd. Marabá', style: TextStyle(fontSize: 9, color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Detalhe dos fatores de match
-                _matchFactorRow('Pelagem Siamesa Creme', 1.0),
-                _matchFactorRow('Olhos Azuis Intensos', 0.92),
-                _matchFactorRow('Sem Coleira identificada', 1.0),
-                _matchFactorRow('Localização aproximada (2.3 km)', 0.72),
-
-                const SizedBox(height: 24),
-                // Ações do Dialog
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.grey[700],
-                          side: BorderSide(color: Colors.grey[300]!),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Voltar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          final lauraPost = _appState.posts.firstWhere((p) => p.id == '1');
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ChatScreen(post: lauraPost),
-                            ),
-                          );
-                        },
-                        child: const Text(
-                          'Abrir Chat',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: const Icon(Icons.search_off,
+                size: 36, color: AppColors.textTertiary),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Nenhum pet encontrado',
+            style: GoogleFonts.inter(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              color: AppColors.onSurface,
             ),
           ),
-        );
-      },
-    );
-  }
-
-  Widget _matchFactorRow(String factor, double score) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(factor, style: const TextStyle(fontSize: 11, color: Colors.black87)),
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                child: FractionallySizedBox(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: score,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '${(score * 100).toInt()}%',
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green),
-              ),
-            ],
-          )
+          const SizedBox(height: 6),
+          Text(
+            'Tente outros termos ou altere os filtros.',
+            style: GoogleFonts.inter(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+            ),
+          ),
         ],
       ),
     );

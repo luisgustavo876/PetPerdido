@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../models/app_state.dart';
-import '../../models/post_model.dart';
 import 'chat_screen.dart';
 
 class ChatsScreen extends StatefulWidget {

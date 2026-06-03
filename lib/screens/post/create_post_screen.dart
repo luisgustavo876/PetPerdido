@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../models/post_model.dart';
 import '../../models/app_state.dart';
+import '../../services/auth_service.dart';
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
@@ -64,10 +65,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final double lat = -23.5897 + (DateTime.now().millisecond % 100) * 0.0003;
     final double lng = -48.0533 + (DateTime.now().microsecond % 100) * 0.0003;
 
+    final user = AuthService.currentUser;
     final newPost = PostModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      userId: 'myUser',
-      userName: 'Carol Mendes',
+      userId: user?.uid ?? 'anon',
+      userName: AuthService.currentUserName,
       type: _selectedType,
       petName: _selectedType == PostType.lost ? _petNameController.text.trim() : 'Sem nome',
       description: _descController.text.trim(),
@@ -75,20 +77,20 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       lastSeenAddress: _addressController.text.trim(),
       latitude: lat,
       longitude: lng,
-      photoUrl: _selectedPhoto ?? 'assets/images/dog_lost.png',
+      photoUrl: _selectedPhoto,
       createdAt: DateTime.now(),
       breed: _breedController.text.trim(),
       species: _selectedSpecies,
       size: _selectedSize,
       sex: _selectedSex,
       points: _offerReward && _selectedType == PostType.lost ? _rewardPoints.toInt() : 0,
-      helpersCount: 1,
+      helpersCount: 0,
       sightingsCount: 0,
-      ownerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+      ownerAvatar: user?.photoURL,
       traits: _selectedTraits.toList(),
     );
 
-    _appState.addPost(newPost);
+    await _appState.addPost(newPost);
 
     setState(() => _isLoading = false);
 
