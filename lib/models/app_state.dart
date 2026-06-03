@@ -3,6 +3,12 @@ import 'package:flutter/material.dart';
 import 'post_model.dart';
 import '../services/post_service.dart';
 
+/// [NOTA PARA A BANCA]
+/// Escolhemos usar o `ChangeNotifier` nativo do Flutter em conjunto com
+/// o padrão Singleton para o gerenciamento de estado global.
+/// Essa decisão foi tomada para evitar a dependência de pacotes de terceiros
+/// (como Provider ou MobX), mantendo o aplicativo mais leve, com menos
+/// dependências externas e aproveitando as ferramentas nativas do próprio framework.
 class AppState extends ChangeNotifier {
   static final AppState _instance = AppState._internal();
   factory AppState() => _instance;

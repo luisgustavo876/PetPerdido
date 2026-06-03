@@ -101,7 +101,7 @@ class _DetailScreenState extends State<DetailScreen> {
           width: double.infinity,
           color: AppColors.background,
           child: post.photoUrl != null
-              ? Image.asset(post.photoUrl!, fit: BoxFit.cover)
+              ? _buildHeroImage(post.photoUrl!)
               : const Center(
                   child: Icon(Icons.pets, size: 80, color: AppColors.textTertiary)),
         ),
@@ -522,16 +522,18 @@ class _DetailScreenState extends State<DetailScreen> {
           children: [
             OutlinedButton.icon(
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Gerando cartaz para impressão...')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ChatScreen(post: post)),
                 );
               },
-              icon: const Icon(Icons.print_outlined, size: 16),
-              label: const Text('Cartaz'),
+              icon: const Icon(Icons.chat_bubble_outline, size: 16),
+              label: const Text('Chat'),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(0, 50),
                 padding: const EdgeInsets.symmetric(horizontal: 20),
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
               ),
             ),
             const SizedBox(width: 12),
@@ -779,5 +781,25 @@ class _DetailScreenState extends State<DetailScreen> {
       case PostType.sighted:
         return AppColors.tagSightedSurface;
     }
+  }
+
+  /// Exibe imagem hero de rede ou asset local.
+  Widget _buildHeroImage(String url) {
+    if (url.startsWith('http')) {
+      return Image.network(
+        url,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: 300,
+        loadingBuilder: (_, child, progress) {
+          if (progress == null) return child;
+          return const Center(child: CircularProgressIndicator());
+        },
+        errorBuilder: (_, __, ___) => const Center(
+          child: Icon(Icons.broken_image, size: 80, color: AppColors.textTertiary),
+        ),
+      );
+    }
+    return Image.asset(url, fit: BoxFit.cover);
   }
 }

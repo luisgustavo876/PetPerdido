@@ -3,25 +3,21 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_colors.dart';
 import '../../models/app_state.dart';
 
-class PointsScreen extends StatefulWidget {
+/// Tela de Pontos e Recompensas.
+/// Versão simplificada para o protótipo do TCC.
+class PointsScreen extends StatelessWidget {
   const PointsScreen({super.key});
 
-  @override
-  State<PointsScreen> createState() => _PointsScreenState();
-}
-
-class _PointsScreenState extends State<PointsScreen> {
-  final AppState _appState = AppState();
-
-  final List<Map<String, dynamic>> _rewards = [
+  // Lista de recompensas disponíveis
+  static const List<Map<String, dynamic>> _rewards = [
     {
       'id': 'banho_gratis',
       'title': 'Banho Completo',
       'partner': 'PetShop Amigão',
       'points': 100,
       'icon': Icons.shower_outlined,
-      'color': const Color(0xFF2563EB),
-      'surface': const Color(0xFFEFF6FF),
+      'color': Color(0xFF2563EB),
+      'surface': Color(0xFFEFF6FF),
     },
     {
       'id': 'saco_racao',
@@ -29,8 +25,8 @@ class _PointsScreenState extends State<PointsScreen> {
       'partner': 'AgroPet Silva',
       'points': 150,
       'icon': Icons.backpack_outlined,
-      'color': const Color(0xFFD97706),
-      'surface': const Color(0xFFFFFBEB),
+      'color': Color(0xFFD97706),
+      'surface': Color(0xFFFFFBEB),
     },
     {
       'id': 'consulta_vet',
@@ -38,79 +34,87 @@ class _PointsScreenState extends State<PointsScreen> {
       'partner': 'Clínica ProBicho',
       'points': 250,
       'icon': Icons.medical_services_outlined,
-      'color': const Color(0xFF16A34A),
-      'surface': const Color(0xFFF0FDF4),
+      'color': Color(0xFF16A34A),
+      'surface': Color(0xFFF0FDF4),
     },
     {
-      'id': 'castracao_solidaria',
+      'id': 'castracao',
       'title': 'Castração Solidária',
       'partner': 'Hospital Vet Municipal',
       'points': 300,
       'icon': Icons.pets_outlined,
-      'color': const Color(0xFF7C3AED),
-      'surface': const Color(0xFFF5F3FF),
+      'color': Color(0xFF7C3AED),
+      'surface': Color(0xFFF5F3FF),
     },
   ];
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: ListenableBuilder(
-        listenable: _appState,
-        builder: (context, _) {
-          final points = _appState.userPoints;
-          final redeemed = _appState.redeemedRewards;
+    final appState = AppState();
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildPointsCard(points),
-                const SizedBox(height: 16),
-                _buildLevelCard(points),
-                const SizedBox(height: 28),
-                Text(
-                  'Recompensas',
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
-                    letterSpacing: -0.3,
-                  ),
+    return ListenableBuilder(
+      listenable: appState,
+      builder: (context, _) {
+        final points = appState.userPoints;
+        final redeemed = appState.redeemedRewards;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Card principal de pontos
+              _buildPointsCard(points),
+              const SizedBox(height: 16),
+
+              // Barra de progresso de nível
+              _buildLevelCard(points),
+              const SizedBox(height: 28),
+
+              // Título seção recompensas
+              Text(
+                'Recompensas',
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.onSurface,
+                  letterSpacing: -0.3,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Use seus pontos em parceiros locais de Itapetininga.',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Use seus pontos em parceiros locais de Itapetininga.',
+                style: GoogleFonts.inter(
+                    fontSize: 13, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+
+              // Grid de recompensas
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 0.85,
                 ),
-                const SizedBox(height: 16),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.85,
-                  ),
-                  itemCount: _rewards.length,
-                  itemBuilder: (context, index) {
-                    final r = _rewards[index];
-                    return _buildRewardCard(
-                        context, r, points, redeemed);
-                  },
-                ),
-                const SizedBox(height: 32),
-              ],
-            ),
-          );
-        },
-      ),
+                itemCount: _rewards.length,
+                itemBuilder: (context, index) {
+                  return _buildRewardCard(
+                    context,
+                    _rewards[index],
+                    points,
+                    redeemed,
+                    appState,
+                  );
+                },
+              ),
+              const SizedBox(height: 32),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -124,12 +128,12 @@ class _PointsScreenState extends State<PointsScreen> {
       ),
       child: Stack(
         children: [
-          Positioned(
+          const Positioned(
             right: -12,
             bottom: -12,
             child: Opacity(
               opacity: 0.08,
-              child: const Icon(Icons.pets, size: 100, color: Colors.white),
+              child: Icon(Icons.pets, size: 100, color: Colors.white),
             ),
           ),
           Column(
@@ -171,8 +175,8 @@ class _PointsScreenState extends State<PointsScreen> {
               ),
               const SizedBox(height: 14),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
@@ -259,8 +263,13 @@ class _PointsScreenState extends State<PointsScreen> {
     );
   }
 
-  Widget _buildRewardCard(BuildContext context, Map<String, dynamic> reward,
-      int points, List<String> redeemed) {
+  Widget _buildRewardCard(
+    BuildContext context,
+    Map<String, dynamic> reward,
+    int points,
+    List<String> redeemed,
+    AppState appState,
+  ) {
     final id = reward['id'] as String;
     final cost = reward['points'] as int;
     final isRedeemed = redeemed.contains(id);
@@ -276,7 +285,9 @@ class _PointsScreenState extends State<PointsScreen> {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: canRedeem ? AppColors.primary.withValues(alpha: 0.3) : AppColors.divider,
+            color: canRedeem
+                ? AppColors.primary.withValues(alpha: 0.3)
+                : AppColors.divider,
             width: canRedeem ? 1.5 : 0.5,
           ),
         ),
@@ -333,7 +344,7 @@ class _PointsScreenState extends State<PointsScreen> {
                 GestureDetector(
                   onTap: canRedeem
                       ? () => _redeem(
-                          context, id, reward['title'] as String, cost)
+                          context, id, reward['title'] as String, cost, appState)
                       : null,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
@@ -368,94 +379,89 @@ class _PointsScreenState extends State<PointsScreen> {
     );
   }
 
-  void _redeem(
-      BuildContext context, String id, String title, int cost) {
-    final success = _appState.redeemReward(id, cost);
+  void _redeem(BuildContext context, String id, String title, int cost,
+      AppState appState) {
+    final success = appState.redeemReward(id, cost);
     if (!success) return;
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return Dialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDF4),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: const Icon(Icons.check_rounded,
-                      color: Color(0xFF16A34A), size: 32),
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(18),
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  'Resgate realizado!',
-                  style: GoogleFonts.inter(
+                child: const Icon(Icons.check_rounded,
+                    color: Color(0xFF16A34A), size: 32),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Resgate realizado!',
+                style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
-                  ),
+                    color: AppColors.onSurface),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Apresente o código no parceiro para utilizar o benefício.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.divider),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Apresente o código no parceiro para utilizar o benefício.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                      fontSize: 13, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.background,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.divider),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        'CÓDIGO DE RESGATE',
-                        style: GoogleFonts.inter(
-                            fontSize: 10,
-                            color: AppColors.textTertiary,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5),
+                child: const Column(
+                  children: [
+                    Text(
+                      'CÓDIGO DE RESGATE',
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: AppColors.textTertiary,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'PET-HELP-5897',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                        letterSpacing: 1,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'PET-HELP-5897',
-                        style: GoogleFonts.inter(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 20,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Confirmar'),
-                  ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Confirmar'),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

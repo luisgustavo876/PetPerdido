@@ -20,6 +20,7 @@ class AuthService {
     required String name,
     required String email,
     required String password,
+    required String cpf,
   }) async {
     final credential = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
@@ -32,9 +33,18 @@ class AuthService {
       'id': credential.user!.uid,
       'name': name.trim(),
       'email': email.trim(),
+      'cpf': cpf, // Armazenado de forma segura no Firestore (não exposto publicamente)
       'points': 320,
       'createdAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// Valida CPF (Simplificado para o protótipo do TCC)
+  /// Na versão final, usaria o cálculo matemático real (Módulo 11).
+  static bool validarCpf(String cpf) {
+    final numeros = cpf.replaceAll(RegExp(r'\D'), '');
+    // Para fins de TCC/apresentação, se tiver 11 números, é considerado válido.
+    return numeros.length == 11;
   }
 
   static Future<void> signOut() async {

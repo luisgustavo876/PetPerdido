@@ -59,7 +59,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Simulação rápida de resposta do tutor após 1.5 segundos (se for o primeiro contato)
     if (widget.post.id == '3' && (_appState.chats[widget.post.id]?.length ?? 0) == 1) {
-      Future.delayed(const Duration(seconds: 1500), () {
+      Future.delayed(const Duration(milliseconds: 1500), () {
         if (mounted) {
           _appState.addMessage(
             widget.post.id,

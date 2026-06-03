@@ -47,10 +47,10 @@ class PetPostCard extends StatelessWidget {
           width: double.infinity,
           color: AppColors.background,
           child: post.photoUrl != null
-              ? Image.asset(post.photoUrl!, fit: BoxFit.cover)
-              : const Center(
-                  child: Icon(Icons.pets, size: 64, color: AppColors.textTertiary),
-                ),
+            ? _renderImage(post.photoUrl!)
+            : const Center(
+                child: Icon(Icons.pets, size: 64, color: AppColors.textTertiary),
+              ),
         ),
         // Status pill — canto superior esquerdo
         Positioned(
@@ -223,4 +223,22 @@ class PetPostCard extends StatelessWidget {
     }
   }
 
+  /// Exibe imagem de rede (Firebase Storage) ou asset local.
+  Widget _renderImage(String url) {
+    if (url.startsWith('http')) {
+      return Image.network(
+        url,
+        fit: BoxFit.cover,
+        loadingBuilder: (_, child, progress) {
+          if (progress == null) return child;
+          return const Center(
+            child: CircularProgressIndicator(strokeWidth: 2),
+          );
+        },
+        errorBuilder: (_, __, ___) =>
+            const Center(child: Icon(Icons.broken_image, color: AppColors.textTertiary, size: 48)),
+      );
+    }
+    return Image.asset(url, fit: BoxFit.cover);
+  }
 }

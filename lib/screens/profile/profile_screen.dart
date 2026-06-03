@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../core/app_routes.dart';
+import '../../services/auth_service.dart';
 
 /// Tela de Perfil do usuário.
 /// Esqueleto visual — dados reais virão do Firebase nas próximas iterações.
@@ -148,10 +149,9 @@ class ProfileScreen extends StatelessWidget {
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              // TODO: Firebase signOut + limpar estado
-              Navigator.pushReplacementNamed(context, AppRoutes.login);
+              await AuthService.signOut(); // Firebase signOut → AuthGate redireciona
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.tagLost,

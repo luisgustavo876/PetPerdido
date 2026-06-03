@@ -1,8 +1,11 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/app_colors.dart';
 import '../../models/post_model.dart';
 import '../../models/app_state.dart';
 import '../../services/auth_service.dart';
+import '../../services/storage_service.dart';
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
@@ -17,7 +20,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   int _currentStep = 1;
   PostType _selectedType = PostType.lost;
-  String? _selectedPhoto; // Simulado
+  XFile? _selectedImageFile;   // Arquivo real selecionado
+  Uint8List? _imageBytes;       // Bytes para preview (funciona na web e mobile)
   
   // Dados do form
   final _petNameController = TextEditingController();
@@ -50,6 +54,24 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     super.dispose();
   }
 
+  /// Abre o seletor de imagens (galeria ou câmera).
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 85,
+    );
+    if (image != null) {
+      final bytes = await image.readAsBytes();
+      setState(() {
+        _selectedImageFile = image;
+        _imageBytes = bytes;
+      });
+    }
+  }
+
   void _onPublish() async {
     if (_descController.text.trim().length < 10) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -59,15 +81,33 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
 
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1500));
-    
+
     // Coordenadas aproximadas em Itapetininga, SP
     final double lat = -23.5897 + (DateTime.now().millisecond % 100) * 0.0003;
     final double lng = -48.0533 + (DateTime.now().microsecond % 100) * 0.0003;
 
+    // ID único do post (gerado antes do upload para usar como pasta no Storage)
+    final String postId = DateTime.now().millisecondsSinceEpoch.toString();
+
+    // Upload da foto para o Firebase Storage (se houver)
+    String? photoUrl;
+    if (_selectedImageFile != null) {
+      try {
+        photoUrl = await StorageService.uploadPostImage(_selectedImageFile!, postId);
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Erro ao enviar a foto. Tente novamente.')),
+          );
+        }
+        return;
+      }
+    }
+
     final user = AuthService.currentUser;
     final newPost = PostModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: postId,
       userId: user?.uid ?? 'anon',
       userName: AuthService.currentUserName,
       type: _selectedType,
@@ -77,13 +117,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       lastSeenAddress: _addressController.text.trim(),
       latitude: lat,
       longitude: lng,
-      photoUrl: _selectedPhoto,
+      photoUrl: photoUrl,  // URL real do Firebase Storage (ou null)
       createdAt: DateTime.now(),
       breed: _breedController.text.trim(),
       species: _selectedSpecies,
       size: _selectedSize,
       sex: _selectedSex,
-      points: _offerReward && _selectedType == PostType.lost ? _rewardPoints.toInt() : 0,
+      points: 0,
       helpersCount: 0,
       sightingsCount: 0,
       ownerAvatar: user?.photoURL,
@@ -180,7 +220,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  if (_currentStep == 1) _buildStep1() else if (_currentStep == 2) _buildStep2() else _buildStep3(),
+                  if (_currentStep == 1) _buildStep1() else _buildStep2(),
                 ],
               ),
             ),
@@ -193,7 +233,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   Widget _buildProgressStepper() {
     return Row(
-      children: List.generate(3, (index) {
+      children: List.generate(2, (index) {
         final step = index + 1;
         final isActive = _currentStep >= step;
         return Expanded(
@@ -222,7 +262,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       {
         'type': PostType.sighted,
         'title': 'Avistei um pet solto',
-        'desc': 'Você viu um animal vagando assustado sem coleira na rua.',
+        'desc': 'Você viu um pet que parece estar perdido, mas não conseguiu acolhê-lo.',
         'color': AppColors.tagSighted,
         'icon': Icons.visibility_outlined,
       },
@@ -328,16 +368,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ),
         const SizedBox(height: 20),
 
-        // Box de foto com preview simulado
+        // Box de foto com preview real
         GestureDetector(
-          onTap: () {
-            setState(() {
-              _selectedPhoto = 'assets/images/dog_found.jpg';
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Foto anexada para visualização!')),
-            );
-          },
+          onTap: _pickImage,
           child: Container(
             height: 150,
             width: double.infinity,
@@ -346,17 +379,25 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
             ),
-            child: _selectedPhoto != null
+            child: _imageBytes != null
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: Image.asset(_selectedPhoto!, fit: BoxFit.cover),
+                    child: Image.memory(_imageBytes!, fit: BoxFit.cover),
                   )
                 : const Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.add_a_photo_outlined, size: 36, color: Colors.grey),
                       SizedBox(height: 8),
-                      Text('Tirar ou carregar foto do pet', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text(
+                        'Toque para escolher uma foto',
+                        style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Câmera ou galeria',
+                        style: TextStyle(color: Colors.grey, fontSize: 11),
+                      ),
                     ],
                   ),
           ),
@@ -522,11 +563,31 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           ),
         ),
         const SizedBox(height: 16),
+
+        // Endereço ou bairro (movido do antigo Step 3)
+        const Text('Endereço ou Bairro', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _addressController,
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.location_on, color: AppColors.primary),
+            hintText: 'Ex: Rua das Flores, Vila Barth...',
+            filled: true,
+            fillColor: Colors.grey[50],
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[200]!)),
+          ),
+        ),
+        const SizedBox(height: 16),
       ],
     );
   }
 
-  Widget _buildStep3() {
+  // Step 3 removido — localização agora está no Step 2
+  // Notificação de vizinhos é automática (não configurável pelo usuário)
+  // Recompensa em dinheiro não é funcionalidade do app
+
+  // Mantido apenas para evitar erros de referência — não é usado
+  Widget _buildStep3Unused() {
     final int estimatedNeighbors = (_notificationRadius * 260).toInt();
 
     return Column(
@@ -724,7 +785,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 onPressed: _isLoading
                     ? null
                     : () {
-                        if (_currentStep < 3) {
+                        if (_currentStep < 2) {
                           setState(() => _currentStep++);
                         } else {
                           _onPublish();
@@ -733,7 +794,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 child: _isLoading
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                     : Text(
-                        _currentStep == 3 ? 'Publicar Anúncio' : 'Avançar',
+                        _currentStep == 2 ? 'Publicar Anúncio' : 'Avançar',
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       ),
               ),

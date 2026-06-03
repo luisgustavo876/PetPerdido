@@ -42,6 +42,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         name: _nameController.text,
         email: _emailController.text,
         password: _passwordController.text,
+        cpf: _cpfController.text, // Salvo no Firestore
       );
       // Roteamento via authStateChanges no main.dart
     } on FirebaseAuthException catch (e) {
@@ -146,8 +147,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     FilteringTextInputFormatter.digitsOnly,
                     LengthLimitingTextInputFormatter(11),
                   ],
-                  validator: (v) =>
-                      (v == null || v.length != 11) ? 'CPF inválido' : null,
+                  validator: (v) {
+                    if (v == null || v.length != 11) return 'CPF deve ter 11 dígitos';
+                    if (!AuthService.validarCpf(v)) return 'CPF inválido';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 14),
                 CustomTextField(
