@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/app_colors.dart';
 import '../../models/post_model.dart';
 import '../../services/auth_service.dart';
+import '../../services/post_service.dart';
 import '../../services/storage_service.dart';
 
 class CreatePostScreen extends StatefulWidget {

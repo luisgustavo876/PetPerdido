@@ -171,19 +171,13 @@ class _ChatScreenState extends State<ChatScreen> {
                           (index == messages.length - 1 ||
                               messages[index + 1]['senderId'] != msg['senderId']);
 
-                      return _buildMessageBubble(
-                        text: msg['message'],
-                        isMe: isMe,
-                        time: msg['createdAt'],
-                        photo: msg['photoUrl'],
-                        showAvatar: showAvatar,
-                      );
+                      return _buildMessageBubble(msg, isMe);
                     },
                   );
                 },
               ),
             ),
-            _buildInputArea(),
+            _buildInputArea(context),
           ],
         ),
       ),
