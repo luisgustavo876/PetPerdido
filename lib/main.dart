@@ -1,11 +1,13 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'core/app_constants.dart';
 import 'core/app_routes.dart';
 import 'core/app_theme.dart';
 import 'firebase_options.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/main_screen.dart';
+import 'services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,7 +23,7 @@ class PetPerdidoApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'PetPerdido',
+      title: AppConstants.appName,
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
       routes: AppRoutes.routes,
@@ -36,7 +38,7 @@ class _AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
+      stream: AuthService.authStateChanges,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(

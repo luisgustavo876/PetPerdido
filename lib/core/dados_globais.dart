@@ -7,24 +7,7 @@ class DadosGlobais {
 
   // Mapa simples para simular o armazenamento local de chats
   // Formato: { "postId": [ {"senderName": "...", "message": "..."} ] }
-  static Map<String, List<Map<String, dynamic>>> chats = {
-    '1': [
-      {
-        'senderId': 'user1',
-        'senderName': 'Carol Mendes',
-        'message': 'Alguém viu a Laura perto da pracinha da Vila Barth?',
-        'createdAt': DateTime.now().subtract(const Duration(hours: 1)),
-        'photoUrl': null,
-      },
-      {
-        'senderId': 'myUser',
-        'senderName': 'Você',
-        'message': 'Eu passei por lá mais cedo, vou ficar atento!',
-        'createdAt': DateTime.now().subtract(const Duration(minutes: 40)),
-        'photoUrl': null,
-      }
-    ]
-  };
+  static final Map<String, List<Map<String, dynamic>>> chats = {};
 
   /// Adiciona uma nova mensagem em um chat
   static void adicionarMensagem(String postId, String senderId, String senderName, String message) {

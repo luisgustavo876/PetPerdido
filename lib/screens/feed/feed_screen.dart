@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_colors.dart';
 import '../../models/post_model.dart';
-import '../../models/post_model.dart';
 import '../../services/post_service.dart';
 import '../../widgets/pet_post_card.dart';
 import 'detail_screen.dart';

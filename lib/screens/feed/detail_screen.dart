@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_colors.dart';
+import '../../core/post_type_style.dart';
 import '../../models/post_model.dart';
 import '../../core/dados_globais.dart';
 import '../../services/post_service.dart';
+import '../../widgets/pet_image.dart';
 import '../chat/chat_screen.dart';
 
 class DetailScreen extends StatefulWidget {
@@ -97,10 +99,7 @@ class _DetailScreenState extends State<DetailScreen> {
           height: 300,
           width: double.infinity,
           color: AppColors.background,
-          child: post.photoUrl != null
-              ? _buildHeroImage(post.photoUrl!)
-              : const Center(
-                  child: Icon(Icons.pets, size: 80, color: AppColors.textTertiary)),
+          child: PetImage(url: post.photoUrl, iconSize: 80),
         ),
         // Gradiente topo para botões
         Positioned(
@@ -160,8 +159,8 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Widget _buildHeader(PostModel post) {
-    final statusColor = _statusColor(post.type);
-    final statusSurface = _statusSurface(post.type);
+    final statusColor = post.type.color;
+    final statusSurface = post.type.surface;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,9 +327,7 @@ class _DetailScreenState extends State<DetailScreen> {
           CircleAvatar(
             radius: 22,
             backgroundColor: AppColors.primarySurface,
-            backgroundImage: post.ownerAvatar != null
-                ? NetworkImage(post.ownerAvatar!)
-                : null,
+            backgroundImage: PetImage.provider(post.ownerAvatar),
             child: post.ownerAvatar == null
                 ? Text(post.userName[0].toUpperCase(),
                     style: GoogleFonts.inter(
@@ -766,47 +763,5 @@ class _DetailScreenState extends State<DetailScreen> {
         );
       },
     );
-  }
-
-  Color _statusColor(PostType type) {
-    switch (type) {
-      case PostType.lost:
-        return AppColors.tagLost;
-      case PostType.found:
-        return AppColors.tagFound;
-      case PostType.sighted:
-        return AppColors.tagSighted;
-    }
-  }
-
-  Color _statusSurface(PostType type) {
-    switch (type) {
-      case PostType.lost:
-        return AppColors.tagLostSurface;
-      case PostType.found:
-        return AppColors.tagFoundSurface;
-      case PostType.sighted:
-        return AppColors.tagSightedSurface;
-    }
-  }
-
-  /// Exibe imagem hero de rede ou asset local.
-  Widget _buildHeroImage(String url) {
-    if (url.startsWith('http')) {
-      return Image.network(
-        url,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: 300,
-        loadingBuilder: (_, child, progress) {
-          if (progress == null) return child;
-          return const Center(child: CircularProgressIndicator());
-        },
-        errorBuilder: (_, __, ___) => const Center(
-          child: Icon(Icons.broken_image, size: 80, color: AppColors.textTertiary),
-        ),
-      );
-    }
-    return Image.asset(url, fit: BoxFit.cover);
   }
 }

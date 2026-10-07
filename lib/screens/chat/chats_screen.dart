@@ -3,6 +3,7 @@ import '../../core/app_colors.dart';
 import '../../core/dados_globais.dart';
 import '../../models/post_model.dart';
 import '../../services/post_service.dart';
+import '../../widgets/pet_image.dart';
 import 'chat_screen.dart';
 
 class ChatsScreen extends StatefulWidget {
@@ -65,9 +66,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
               final rawTime = hasMessages ? messages.last['createdAt'] as DateTime : post.createdAt;
               final timeAgo = _timeAgo(rawTime);
 
-              // Fake unread count
-              final int unreadCount = (post.id == '1') ? 2 : 0;
-
               return InkWell(
                 onTap: () {
                   Navigator.push(
@@ -93,9 +91,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                               border: Border.all(color: Colors.grey[100]!, width: 2),
                             ),
                             child: ClipOval(
-                              child: post.photoUrl != null
-                                  ? Image.asset(post.photoUrl!, fit: BoxFit.cover)
-                                  : const Icon(Icons.pets, color: Colors.grey),
+                              child: PetImage(url: post.photoUrl, iconSize: 24),
                             ),
                           ),
                           Positioned(
@@ -126,12 +122,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    'Laura' == post.petName
-                                        ? 'Laura (${post.userName})'
-                                        : '${post.petName.isNotEmpty && post.petName != 'Sem nome' ? post.petName : 'Sem nome'} (${post.userName})',
-                                    style: TextStyle(
+                                    '${post.petName.isNotEmpty && post.petName != 'Sem nome' ? post.petName : 'Sem nome'} (${post.userName})',
+                                    style: const TextStyle(
                                       fontSize: 15,
-                                      fontWeight: unreadCount > 0 ? FontWeight.w900 : FontWeight.bold,
+                                      fontWeight: FontWeight.bold,
                                       color: AppColors.onSurface,
                                     ),
                                     maxLines: 1,
@@ -140,46 +134,22 @@ class _ChatsScreenState extends State<ChatsScreen> {
                                 ),
                                 Text(
                                   timeAgo,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 11,
-                                    color: unreadCount > 0 ? AppColors.primary : Colors.grey,
-                                    fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+                                    color: Colors.grey,
                                   ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    lastMsg,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: unreadCount > 0 ? Colors.black87 : Colors.grey[600],
-                                      fontWeight: unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                if (unreadCount > 0)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: const BoxDecoration(
-                                      color: AppColors.primary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Text(
-                                      '$unreadCount',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                            Text(
+                              lastMsg,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),

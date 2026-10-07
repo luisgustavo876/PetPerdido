@@ -15,8 +15,6 @@ class CreatePostScreen extends StatefulWidget {
 }
 
 class _CreatePostScreenState extends State<CreatePostScreen> {
-  final _formKey = GlobalKey<FormState>();
-
   int _currentStep = 1;
   PostType _selectedType = PostType.lost;
   XFile? _selectedImageFile;   // Arquivo real selecionado
@@ -32,10 +30,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   String _selectedSize = 'Médio';
   String _selectedSex = 'Macho';
   
-  bool _notifyRadius = true;
-  double _notificationRadius = 2.0; // 2km
-  bool _offerReward = false;
-  double _rewardPoints = 100.0;
   bool _isLoading = false;
 
   final List<String> _availableTraits = [
@@ -211,21 +205,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           child: _buildProgressStepper(),
         ),
       ),
-      body: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  if (_currentStep == 1) _buildStep1() else _buildStep2(),
-                ],
-              ),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                if (_currentStep == 1) _buildStep1() else _buildStep2(),
+              ],
             ),
-            _buildNavigationButtons(),
-          ],
-        ),
+          ),
+          _buildNavigationButtons(),
+        ],
       ),
     );
   }
@@ -300,7 +291,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: isSelected ? color.withOpacity(0.04) : Colors.grey[50],
+                  color: isSelected ? color.withValues(alpha: 0.04) : Colors.grey[50],
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: isSelected ? color : Colors.grey[200]!,
@@ -312,7 +303,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isSelected ? color.withOpacity(0.12) : Colors.grey[200],
+                        color: isSelected ? color.withValues(alpha: 0.12) : Colors.grey[200],
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -531,7 +522,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             return FilterChip(
               label: Text(trait),
               selected: isSelected,
-              selectedColor: AppColors.primary.withOpacity(0.12),
+              selectedColor: AppColors.primary.withValues(alpha: 0.12),
               checkmarkColor: AppColors.primary,
               labelStyle: TextStyle(color: isSelected ? AppColors.primary : Colors.black87, fontSize: 11),
               onSelected: (val) {
@@ -577,173 +568,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           ),
         ),
         const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  // Step 3 removido — localização agora está no Step 2
-  // Notificação de vizinhos é automática (não configurável pelo usuário)
-  // Recompensa em dinheiro não é funcionalidade do app
-
-  // Mantido apenas para evitar erros de referência — não é usado
-  Widget _buildStep3Unused() {
-    final int estimatedNeighbors = (_notificationRadius * 260).toInt();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Localização & Alertas',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Configure a localização de busca e envie notificações para moradores vizinhos.',
-          style: TextStyle(fontSize: 13, color: Colors.grey),
-        ),
-        const SizedBox(height: 20),
-
-        // Endereço
-        const Text('Endereço ou Bairro', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _addressController,
-          decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.location_on, color: AppColors.primary),
-            hintText: 'Ex: Rua das Flores, Vila Barth...',
-            filled: true,
-            fillColor: Colors.grey[50],
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[200]!)),
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Mapa estático simulado de Itapetininga
-        Container(
-          height: 140,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey[200]!),
-            image: const DecorationImage(
-              image: AssetImage('assets/images/map.png'),
-              fit: BoxFit.cover,
-            ),
-          ),
-          child: const Center(
-            child: Icon(Icons.location_pin, color: AppColors.primary, size: 36),
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Notificar vizinhos raio
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8)],
-            border: Border.all(color: Colors.grey[200]!),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CheckboxListTile(
-                value: _notifyRadius,
-                onChanged: (val) => setState(() => _notifyRadius = val ?? true),
-                title: const Text('Notificar vizinhos na área', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                subtitle: const Text('Dispara push e e-mail imediatamente.', style: TextStyle(fontSize: 11)),
-                activeColor: AppColors.primary,
-                contentPadding: EdgeInsets.zero,
-              ),
-              if (_notifyRadius) ...[
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Raio de Alerta', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    Text('${_notificationRadius.toStringAsFixed(1)} km', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 13)),
-                  ],
-                ),
-                Slider(
-                  value: _notificationRadius,
-                  min: 1.0,
-                  max: 5.0,
-                  divisions: 8,
-                  activeColor: AppColors.primary,
-                  inactiveColor: Colors.grey[200],
-                  onChanged: (val) => setState(() => _notificationRadius = val),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.teal[50],
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.people, color: Colors.teal, size: 14),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Alerta enviado a ~$estimatedNeighbors moradores ativos!',
-                        style: const TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Oferecer recompensa (apenas se for 'lost')
-        if (_selectedType == PostType.lost) ...[
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8)],
-              border: Border.all(color: Colors.grey[200]!),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SwitchListTile(
-                  value: _offerReward,
-                  onChanged: (val) => setState(() => _offerReward = val),
-                  title: const Text('Oferecer Recompensa', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: const Text('Estimula o engajamento dos vizinhos na busca.', style: TextStyle(fontSize: 11)),
-                  activeColor: AppColors.primary,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                if (_offerReward) ...[
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Valor em Pontos', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      Text('${_rewardPoints.toInt()} pts', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber, fontSize: 14)),
-                    ],
-                  ),
-                  Slider(
-                    value: _rewardPoints,
-                    min: 50.0,
-                    max: 300.0,
-                    divisions: 5,
-                    activeColor: Colors.amber,
-                    inactiveColor: Colors.grey[200],
-                    onChanged: (val) => setState(() => _rewardPoints = val),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
       ],
     );
   }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/app_colors.dart';
+import '../core/post_type_style.dart';
 import '../models/post_model.dart';
 import '../screens/chat/chat_screen.dart';
+import 'pet_image.dart';
 
 class PetPostCard extends StatelessWidget {
   final PostModel post;
@@ -38,7 +40,7 @@ class PetPostCard extends StatelessWidget {
   }
 
   Widget _buildImage() {
-    final statusColor = _statusColor(post.type);
+    final statusColor = post.type.color;
 
     return Stack(
       children: [
@@ -46,11 +48,7 @@ class PetPostCard extends StatelessWidget {
           height: 210,
           width: double.infinity,
           color: AppColors.background,
-          child: post.photoUrl != null
-            ? _renderImage(post.photoUrl!)
-            : const Center(
-                child: Icon(Icons.pets, size: 64, color: AppColors.textTertiary),
-              ),
+          child: PetImage(url: post.photoUrl, iconSize: 64),
         ),
         // Status pill — canto superior esquerdo
         Positioned(
@@ -210,35 +208,5 @@ class PetPostCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Color _statusColor(PostType type) {
-    switch (type) {
-      case PostType.lost:
-        return AppColors.tagLost;
-      case PostType.found:
-        return AppColors.tagFound;
-      case PostType.sighted:
-        return AppColors.tagSighted;
-    }
-  }
-
-  /// Exibe imagem de rede (Firebase Storage) ou asset local.
-  Widget _renderImage(String url) {
-    if (url.startsWith('http')) {
-      return Image.network(
-        url,
-        fit: BoxFit.cover,
-        loadingBuilder: (_, child, progress) {
-          if (progress == null) return child;
-          return const Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
-          );
-        },
-        errorBuilder: (_, __, ___) =>
-            const Center(child: Icon(Icons.broken_image, color: AppColors.textTertiary, size: 48)),
-      );
-    }
-    return Image.asset(url, fit: BoxFit.cover);
   }
 }

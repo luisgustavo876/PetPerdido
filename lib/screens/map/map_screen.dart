@@ -3,8 +3,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../core/app_colors.dart';
 import '../../core/app_constants.dart';
 import '../../core/app_routes.dart';
+import '../../core/post_type_style.dart';
 import '../../models/post_model.dart';
 import '../../services/post_service.dart';
+import '../../widgets/pet_image.dart';
 import '../feed/detail_screen.dart';
 
 class MapScreen extends StatefulWidget {
@@ -133,7 +135,7 @@ class _MapScreenState extends State<MapScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
+            color: AppColors.primary.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           )
@@ -206,7 +208,7 @@ class _MapScreenState extends State<MapScreen> {
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 3),
           )
@@ -224,12 +226,12 @@ class _MapScreenState extends State<MapScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
+        color: Colors.white.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 3),
           )
@@ -297,7 +299,7 @@ class _PostBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _statusColor(post.type);
+    final statusColor = post.type.color;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.44,
@@ -337,9 +339,7 @@ class _PostBottomSheet extends StatelessWidget {
                       width: 90,
                       height: 90,
                       color: Colors.grey[100],
-                      child: post.photoUrl != null
-                          ? Image.asset(post.photoUrl!, fit: BoxFit.cover)
-                          : const Icon(Icons.pets, color: Colors.grey),
+                      child: PetImage(url: post.photoUrl, iconSize: 32),
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -352,9 +352,9 @@ class _PostBottomSheet extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.08),
+                                color: statusColor.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: statusColor.withOpacity(0.2)),
+                                border: Border.all(color: statusColor.withValues(alpha: 0.2)),
                               ),
                               child: Text(
                                 post.type.label.toUpperCase(),
@@ -489,16 +489,5 @@ class _PostBottomSheet extends StatelessWidget {
         );
       },
     );
-  }
-
-  Color _statusColor(PostType type) {
-    switch (type) {
-      case PostType.lost:
-        return AppColors.tagLost;
-      case PostType.found:
-        return AppColors.tagFound;
-      case PostType.sighted:
-        return AppColors.tagSighted;
-    }
   }
 }

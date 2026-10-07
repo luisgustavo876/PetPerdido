@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_colors.dart';
+import '../../core/app_constants.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
@@ -145,10 +146,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(11),
+                    LengthLimitingTextInputFormatter(AppConstants.cpfLength),
                   ],
                   validator: (v) {
-                    if (v == null || v.length != 11) return 'CPF deve ter 11 dígitos';
+                    if (v == null || v.length != AppConstants.cpfLength) {
+                      return 'CPF deve ter ${AppConstants.cpfLength} dígitos';
+                    }
                     if (!AuthService.validarCpf(v)) return 'CPF inválido';
                     return null;
                   },
@@ -161,7 +164,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   isPassword: true,
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Informe a senha';
-                    if (v.length < 6) return 'Mínimo de 6 caracteres';
+                    if (v.length < AppConstants.minPasswordLength) {
+                      return 'Mínimo de ${AppConstants.minPasswordLength} caracteres';
+                    }
                     return null;
                   },
                 ),

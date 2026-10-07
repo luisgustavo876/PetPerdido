@@ -12,3 +12,7 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Saídas de build do Android/Kotlin
+/build/
+.kotlin/

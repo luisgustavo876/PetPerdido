@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../core/dados_globais.dart';
 import '../../models/post_model.dart';
+import '../../widgets/pet_image.dart';
 
 class ChatScreen extends StatefulWidget {
   final PostModel post;
@@ -56,23 +57,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _msgController.clear();
     // Forçar rolagem para baixo
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-
-    // Simulação rápida de resposta do tutor após 1.5 segundos (se for o primeiro contato)
-    if (widget.post.id == '3' && (DadosGlobais.chats[widget.post.id]?.length ?? 0) == 1) {
-      Future.delayed(const Duration(milliseconds: 1500), () {
-        if (mounted) {
-          setState(() {
-            DadosGlobais.adicionarMensagem(
-              widget.post.id,
-              widget.post.userId,
-              widget.post.userName,
-              'Muito obrigado pelo contato! Onde exatamente você encontrou ele?',
-            );
-          });
-          WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-        }
-      });
-    }
   }
 
   @override
@@ -92,9 +76,7 @@ class _ChatScreenState extends State<ChatScreen> {
             CircleAvatar(
               radius: 18,
               backgroundColor: Colors.grey[200],
-              backgroundImage: widget.post.photoUrl != null
-                  ? AssetImage(widget.post.photoUrl!)
-                  : null,
+              backgroundImage: PetImage.provider(widget.post.photoUrl),
               child: widget.post.photoUrl == null
                   ? const Icon(Icons.pets, size: 16)
                   : null,
@@ -167,10 +149,6 @@ class _ChatScreenState extends State<ChatScreen> {
                     itemBuilder: (context, index) {
                       final msg = messages[index];
                       final isMe = msg['senderId'] == 'myUser';
-                      final showAvatar = !isMe &&
-                          (index == messages.length - 1 ||
-                              messages[index + 1]['senderId'] != msg['senderId']);
-
                       return _buildMessageBubble(msg, isMe);
                     },
                   );
@@ -194,7 +172,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.08),
+                color: AppColors.primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -237,7 +215,7 @@ class _ChatScreenState extends State<ChatScreen> {
             CircleAvatar(
               radius: 12,
               backgroundColor: AppColors.primaryLight,
-              backgroundImage: widget.post.ownerAvatar != null ? NetworkImage(widget.post.ownerAvatar!) : null,
+              backgroundImage: PetImage.provider(widget.post.ownerAvatar),
               child: widget.post.ownerAvatar == null
                   ? Text(widget.post.userName[0].toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold))
                   : null,
@@ -257,7 +235,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
+                    color: Colors.black.withValues(alpha: 0.03),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   )
@@ -270,7 +248,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   if (photo != null) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.asset(photo, height: 150, width: 200, fit: BoxFit.cover),
+                      child: SizedBox(
+                        height: 150,
+                        width: 200,
+                        child: PetImage(url: photo),
+                      ),
                     ),
                     const SizedBox(height: 6),
                   ],

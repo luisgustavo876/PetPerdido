@@ -42,7 +42,7 @@ class AppTheme {
         elevation: 0,
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        indicatorColor: AppColors.primary.withOpacity(0.1),
+        indicatorColor: AppColors.primary.withValues(alpha: 0.1),
         height: 64,
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {

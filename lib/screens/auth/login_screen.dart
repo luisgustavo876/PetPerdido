@@ -1,7 +1,8 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_colors.dart';
+import '../../core/app_constants.dart';
 import '../../core/app_routes.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/custom_button.dart';
@@ -124,7 +125,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   isPassword: true,
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Informe sua senha';
-                    if (v.length < 6) return 'Mínimo de 6 caracteres';
+                    if (v.length < AppConstants.minPasswordLength) {
+                      return 'Mínimo de ${AppConstants.minPasswordLength} caracteres';
+                    }
                     return null;
                   },
                 ),
@@ -234,8 +237,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () async {
                     if (ctrl.text.trim().isEmpty) return;
                     try {
-                      await FirebaseAuth.instance
-                          .sendPasswordResetEmail(email: ctrl.text.trim());
+                      await AuthService.sendPasswordReset(ctrl.text);
                       if (ctx.mounted) Navigator.pop(ctx);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(

@@ -47,6 +47,11 @@ class AuthService {
     return numeros.length == 11;
   }
 
+  /// Envia o e-mail de redefinição de senha.
+  static Future<void> sendPasswordReset(String email) async {
+    await _auth.sendPasswordResetEmail(email: email.trim());
+  }
+
   static Future<void> signOut() async {
     await _auth.signOut();
   }
