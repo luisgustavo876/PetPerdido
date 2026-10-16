@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/app_colors.dart';
+import '../../core/formatters.dart';
+import '../../core/pet_options.dart';
 import '../../core/post_type_style.dart';
 import '../../models/post_model.dart';
-import '../../core/dados_globais.dart';
+import '../../models/sighting_model.dart';
+import '../../services/auth_service.dart';
 import '../../services/post_service.dart';
+import '../../services/user_service.dart';
 import '../../widgets/pet_image.dart';
-import '../chat/chat_screen.dart';
+import 'widgets/eu_vi_sheet.dart';
 
+/// Detalhe do post: dados do pet, avistamentos reais, favoritar,
+/// compartilhar e, para o autor, marcar como resolvido e excluir.
 class DetailScreen extends StatefulWidget {
   final PostModel post;
 
@@ -18,94 +24,235 @@ class DetailScreen extends StatefulWidget {
 }
 
 class _DetailScreenState extends State<DetailScreen> {
-  late PostModel _currentPost;
+  /// Cópia local, atualizada depois das ações (resolvido, novo avistamento).
+  late PostModel _post = widget.post;
+
+  /// Stream único da tela, criado no initState.
+  late Stream<List<SightingModel>> _avistamentosStream;
+
+  bool _favorito = false;
+  bool _ocupado = false;
+
+  String? get _meuUid => AuthService.currentUser?.uid;
+  bool get _souAutor => _post.userId == _meuUid;
 
   @override
   void initState() {
     super.initState();
-    _currentPost = widget.post;
+    _avistamentosStream = PostService.avistamentosStream(_post.id);
+    _carregarFavorito();
+  }
+
+  Future<void> _carregarFavorito() async {
+    try {
+      final favs = await UserService.favoritos();
+      if (mounted) setState(() => _favorito = favs.contains(_post.id));
+    } catch (_) {
+      // Se não conseguir ler, o coração só aparece vazio.
+    }
+  }
+
+  void _mensagem(String texto) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(texto)));
+
+  Future<void> _alternarFavorito() async {
+    final novo = !_favorito;
+    setState(() => _favorito = novo); // atualiza na hora
+    try {
+      await UserService.definirFavorito(_post.id, novo);
+      _mensagem(novo ? 'Adicionado aos favoritos.' : 'Removido dos favoritos.');
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _favorito = !novo); // desfaz
+      _mensagem('Não foi possível atualizar os favoritos.');
+    }
+  }
+
+  Future<void> _compartilhar() async {
+    await SharePlus.instance.share(ShareParams(
+      text: Formatters.textoCompartilhar(_post),
+      subject: 'PetPerdido: ${_post.type.label}',
+    ));
+  }
+
+  Future<bool> _confirmar(String titulo, String texto, String botao) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(titulo),
+        content: Text(texto),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            child: Text(botao),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
+  Future<void> _marcarResolvido() async {
+    final ok = await _confirmar(
+      'Marcar como resolvido?',
+      'O post sai do mapa e do feed (só aparece com o filtro "Incluir resolvidos").',
+      'Marcar',
+    );
+    if (!ok) return;
+    setState(() => _ocupado = true);
+    try {
+      await PostService.marcarResolvido(_post.id);
+      if (!mounted) return;
+      setState(() => _post = _post.copyWith(isResolved: true));
+      _mensagem('Que bom! Post marcado como resolvido.');
+    } catch (_) {
+      if (mounted) _mensagem('Não foi possível atualizar. Tente novamente.');
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
+    }
+  }
+
+  Future<void> _excluir() async {
+    final ok = await _confirmar(
+      'Excluir este post?',
+      'O post, os avistamentos e as fotos serão apagados. Não dá para desfazer.',
+      'Excluir',
+    );
+    if (!ok || !mounted) return;
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _ocupado = true);
+    try {
+      await PostService.excluirPost(_post);
+      navigator.pop();
+      messenger.showSnackBar(const SnackBar(content: Text('Post excluído.')));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _ocupado = false);
+      _mensagem('Não foi possível excluir. Tente novamente.');
+    }
+  }
+
+  Future<void> _euVi() async {
+    final registrou = await EuViSheet.abrir(context, _post.id);
+    if (!registrou || !mounted) return;
+    setState(() => _post = _post.copyWith(
+          sightingsCount: _post.sightingsCount + 1,
+          helpersCount: _post.helpersCount + 1,
+        ));
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.check_circle, color: AppColors.tagFound, size: 48),
+        title: const Text('Obrigado!'),
+        content: const Text(
+          'Seu avistamento foi registrado e já aparece para quem publicou.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Ótimo'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return StreamBuilder<List<SightingModel>>(
+      stream: _avistamentosStream,
+      builder: (context, snapshot) {
+        final avistamentos = snapshot.data ?? const <SightingModel>[];
+        final jaAvistei = avistamentos.any((s) => s.userId == _meuUid);
+        return Scaffold(
           backgroundColor: AppColors.surface,
           body: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHero(context, _currentPost),
+                _hero(),
                 Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 48),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildHeader(_currentPost),
-                      const SizedBox(height: 20),
-                      _buildSpecGrid(_currentPost),
-                      const SizedBox(height: 24),
-                      if (_currentPost.traits.isNotEmpty) ...[
-                        _sectionTitle('Características'),
-                        const SizedBox(height: 10),
-                        _buildTraits(_currentPost),
-                        const SizedBox(height: 24),
+                      if (_post.isResolved) ...[
+                        _avisoResolvido(),
+                        const SizedBox(height: 16),
                       ],
-                      _sectionTitle('Descrição'),
-                      const SizedBox(height: 10),
+                      _cabecalho(),
+                      const SizedBox(height: 24),
+                      _fichaTecnica(),
+                      if (_post.traits.isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        _titulo('Características'),
+                        _chips(_post.traits),
+                      ],
+                      const SizedBox(height: 24),
+                      _titulo('Descrição'),
                       Text(
-                        _currentPost.description,
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          height: 1.6,
-                          color: AppColors.textSecondary,
-                        ),
+                        _post.description,
+                        style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.6,
+                            color: AppColors.textSecondary),
                       ),
-                      const SizedBox(height: 28),
-                      _sectionTitle('Tutor'),
-                      const SizedBox(height: 10),
-                      _buildTutorCard(context, _currentPost),
-                      const SizedBox(height: 28),
-                      _sectionTitle(
-                          'Avistamentos (${_currentPost.sightingsCount})'),
-                      const SizedBox(height: 12),
-                      _buildTimeline(_currentPost),
-                      const SizedBox(height: 48),
+                      const SizedBox(height: 24),
+                      _titulo('Publicado por'),
+                      _autor(),
+                      const SizedBox(height: 24),
+                      _titulo('Avistamentos (${_post.sightingsCount})'),
+                      _linhaDoTempo(snapshot, avistamentos),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-          bottomNavigationBar: _buildActions(context, _currentPost),
+          bottomNavigationBar: _acoes(jaAvistei),
         );
-  }
-
-  Widget _sectionTitle(String title) {
-    return Text(
-      title,
-      style: GoogleFonts.inter(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-        color: AppColors.onSurface,
-        letterSpacing: -0.2,
-      ),
+      },
     );
   }
 
-  Widget _buildHero(BuildContext context, PostModel post) {
+  // ---------------------------------------------------------------------------
+  // Partes da tela
+  // ---------------------------------------------------------------------------
+
+  Widget _titulo(String texto) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          texto,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: AppColors.onSurface,
+          ),
+        ),
+      );
+
+  Widget _hero() {
     return Stack(
       children: [
         Container(
           height: 300,
           width: double.infinity,
           color: AppColors.background,
-          child: PetImage(url: post.photoUrl, iconSize: 80),
+          child: PetImage(url: _post.photoUrl, iconSize: 80),
         ),
-        // Gradiente topo para botões
         Positioned(
-          top: 0, left: 0, right: 0,
+          top: 0,
+          left: 0,
+          right: 0,
           child: Container(
-            height: 100,
+            height: 104,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
@@ -115,27 +262,25 @@ class _DetailScreenState extends State<DetailScreen> {
             ),
           ),
         ),
-        // Botão voltar
         Positioned(
-          top: 44, left: 16,
-          child: _iconButton(Icons.arrow_back, () => Navigator.pop(context)),
+          top: 40,
+          left: 16,
+          child: _botaoHero(Icons.arrow_back, 'Voltar',
+              () => Navigator.pop(context)),
         ),
-        // Botões direita
         Positioned(
-          top: 44, right: 16,
+          top: 40,
+          right: 16,
           child: Row(
             children: [
-              _iconButton(Icons.share_outlined, () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Link copiado!')),
-                );
-              }),
+              _botaoHero(Icons.share_outlined, 'Compartilhar', _compartilhar),
               const SizedBox(width: 8),
-              _iconButton(Icons.favorite_border, () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Adicionado aos favoritos!')),
-                );
-              }),
+              _botaoHero(
+                _favorito ? Icons.favorite : Icons.favorite_border,
+                _favorito ? 'Remover dos favoritos' : 'Favoritar',
+                _alternarFavorito,
+                cor: _favorito ? AppColors.primary : null,
+              ),
             ],
           ),
         ),
@@ -143,25 +288,47 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
-  Widget _iconButton(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.9),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, size: 18, color: AppColors.onSurface),
+  Widget _botaoHero(IconData icone, String dica, VoidCallback onTap,
+      {Color? cor}) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.9),
+      shape: const CircleBorder(),
+      child: IconButton(
+        tooltip: dica,
+        onPressed: onTap,
+        icon: Icon(icone, size: 20, color: cor ?? AppColors.onSurface),
       ),
     );
   }
 
-  Widget _buildHeader(PostModel post) {
-    final statusColor = post.type.color;
-    final statusSurface = post.type.surface;
+  Widget _avisoResolvido() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.tagFoundSurface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.verified, color: AppColors.tagFound),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Caso resolvido. Obrigado a todos que ajudaram!',
+              style: TextStyle(
+                  fontWeight: FontWeight.w700, color: AppColors.tagFound),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
+  Widget _cabecalho() {
+    final nome = _post.petName.isNotEmpty && _post.petName != 'Sem nome'
+        ? _post.petName
+        : 'Pet sem nome';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -170,217 +337,164 @@ class _DetailScreenState extends State<DetailScreen> {
           children: [
             Expanded(
               child: Text(
-                post.petName.isNotEmpty && post.petName != 'Sem nome'
-                    ? post.petName
-                    : 'Pet sem nome',
-                style: GoogleFonts.inter(
+                nome,
+                style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.onSurface,
                   letterSpacing: -0.5,
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: statusSurface,
+                color: _post.type.surface,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                post.type.label,
-                style: GoogleFonts.inter(
-                  color: statusColor,
+                _post.type.label,
+                style: TextStyle(
+                  color: _post.type.color,
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            const Icon(Icons.location_on_outlined,
-                size: 14, color: AppColors.textTertiary),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                post.lastSeenAddress,
-                style: GoogleFonts.inter(
-                    fontSize: 13, color: AppColors.textSecondary),
-              ),
-            ),
-            if (post.points > 0) ...[
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFBEB),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFFDE68A)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.stars_rounded,
-                        color: Colors.amber, size: 13),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${post.points} pts',
-                      style: GoogleFonts.inter(
-                        color: const Color(0xFF92400E),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
+        const SizedBox(height: 8),
+        _linhaInfo(Icons.location_on_outlined, _post.lastSeenAddress),
+        const SizedBox(height: 4),
+        _linhaInfo(Icons.event_outlined,
+            '${formatarDataHora(_post.eventAt)} · ${Formatters.tempoRelativo(_post.eventAt, DateTime.now())}'),
       ],
     );
   }
 
-  Widget _buildSpecGrid(PostModel post) {
+  Widget _linhaInfo(IconData icone, String texto) {
     return Row(
       children: [
-        Expanded(child: _specItem('Espécie', post.species, Icons.pets_outlined)),
-        const SizedBox(width: 10),
-        Expanded(child: _specItem('Raça', post.breed, Icons.category_outlined)),
-        const SizedBox(width: 10),
-        Expanded(child: _specItem('Porte', post.size, Icons.straighten)),
-        const SizedBox(width: 10),
-        Expanded(child: _specItem('Sexo', post.sex, Icons.wc_outlined)),
+        Icon(icone, size: 16, color: AppColors.textTertiary),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(texto,
+              style:
+                  const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+        ),
       ],
     );
   }
 
-  Widget _specItem(String label, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: AppColors.primary, size: 18),
-          const SizedBox(height: 6),
-          Text(label,
-              style: GoogleFonts.inter(
-                  fontSize: 10, color: AppColors.textTertiary)),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.onSurface,
+  Widget _fichaTecnica() {
+    Widget item(String rotulo, String valor, IconData icone) => Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(16),
             ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTraits(PostModel post) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: post.traits.map((trait) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.divider),
-          ),
-          child: Text(
-            trait,
-            style: GoogleFonts.inter(
-              color: AppColors.textSecondary,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+            child: Column(
+              children: [
+                Icon(icone, color: AppColors.primary, size: 18),
+                const SizedBox(height: 8),
+                Text(rotulo,
+                    style: const TextStyle(
+                        fontSize: 10, color: AppColors.textTertiary)),
+                const SizedBox(height: 4),
+                Text(
+                  valor,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ],
             ),
           ),
         );
-      }).toList(),
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            item('Espécie', _post.species, Icons.pets_outlined),
+            const SizedBox(width: 8),
+            item('Raça', _post.breed, Icons.category_outlined),
+            const SizedBox(width: 8),
+            item('Porte', _post.size, Icons.straighten),
+            const SizedBox(width: 8),
+            item('Sexo', _post.sex, Icons.wc_outlined),
+          ],
+        ),
+        if (_post.colors.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _titulo('Cor'),
+          _chips(_post.colors),
+        ],
+      ],
     );
   }
 
-  Widget _buildTutorCard(BuildContext context, PostModel post) {
+  Widget _chips(List<String> itens) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final item in itens)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Text(item,
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
+          ),
+      ],
+    );
+  }
+
+  Widget _autor() {
+    final inicial =
+        _post.userName.isNotEmpty ? _post.userName[0].toUpperCase() : '?';
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.background,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider, width: 0.5),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 22,
             backgroundColor: AppColors.primarySurface,
-            backgroundImage: PetImage.provider(post.ownerAvatar),
-            child: post.ownerAvatar == null
-                ? Text(post.userName[0].toUpperCase(),
-                    style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                        fontSize: 16))
+            backgroundImage: PetImage.provider(_post.ownerAvatar),
+            child: _post.ownerAvatar == null
+                ? Text(inicial,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, color: AppColors.primary))
                 : null,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      post.userName,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.onSurface,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Icon(Icons.verified,
-                        color: Colors.teal, size: 14),
-                  ],
-                ),
-                const SizedBox(height: 2),
+                Text(_souAutor ? '${_post.userName} (você)' : _post.userName,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
                 Text(
-                  'Membro desde 2024 · 5 ajudas',
-                  style: GoogleFonts.inter(
-                      fontSize: 11, color: AppColors.textTertiary),
+                  'Publicado ${Formatters.tempoRelativo(_post.createdAt, DateTime.now())}',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textTertiary),
                 ),
               ],
-            ),
-          ),
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => ChatScreen(post: post)),
-              );
-            },
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.primarySurface,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.chat_bubble_outline,
-                  color: AppColors.primary, size: 18),
             ),
           ),
         ],
@@ -388,380 +502,186 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
-  Widget _buildTimeline(PostModel post) {
-    final sightings = [
-      {
-        'date': 'Há 2 horas',
-        'address': 'Próximo ao Supermercado Avenida, Vila Barth',
-        'reporter': 'Juliana M.',
-        'desc': 'Vi um gatinho idêntico na calçada. Correu ao me aproximar.',
-      },
-      if (post.sightingsCount >= 2)
-        {
-          'date': 'Ontem, 19:30',
-          'address': 'Rua Bernardino de Campos, Vila Barth',
-          'reporter': 'Marcos A.',
-          'desc': 'Estava debaixo de um carro. Miando bastante.',
-        },
-      if (post.sightingsCount >= 3)
-        {
-          'date': 'Agora mesmo',
-          'address': 'Avistamento recente registrado',
-          'reporter': 'Você',
-          'desc': 'Avistamento adicionado nas proximidades.',
-        },
-    ];
-
-    if (sightings.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          'Nenhum avistamento registrado ainda.',
-          style: GoogleFonts.inter(
-              fontSize: 13, color: AppColors.textSecondary),
+  Widget _linhaDoTempo(AsyncSnapshot<List<SightingModel>> snapshot,
+      List<SightingModel> avistamentos) {
+    if (snapshot.hasError) {
+      return _caixa(
+        'Não foi possível carregar os avistamentos.',
+        acao: TextButton(
+          onPressed: () => setState(() => _avistamentosStream =
+              PostService.avistamentosStream(_post.id)),
+          child: const Text('Tentar de novo'),
         ),
       );
     }
+    if (!snapshot.hasData) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (avistamentos.isEmpty) {
+      return _caixa('Nenhum avistamento registrado ainda.');
+    }
+    return Column(
+      children: [
+        for (var i = 0; i < avistamentos.length; i++)
+          _itemLinhaDoTempo(avistamentos[i],
+              ultimo: i == avistamentos.length - 1),
+      ],
+    );
+  }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: sightings.length,
-      padding: EdgeInsets.zero,
-      itemBuilder: (context, index) {
-        final s = sightings[index];
-        final isLast = index == sightings.length - 1;
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Column(
+  Widget _itemLinhaDoTempo(SightingModel s, {required bool ultimo}) {
+    final quem = s.userId == _meuUid ? 'Você' : s.userName;
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 16,
+            child: Column(
               children: [
+                const SizedBox(height: 16),
                 Container(
                   width: 10,
                   height: 10,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
                 ),
-                if (!isLast)
-                  Container(
-                    width: 1.5,
-                    height: 72,
-                    color: AppColors.divider,
+                if (!ultimo)
+                  Expanded(
+                    child: Container(width: 2, color: AppColors.divider),
                   ),
               ],
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Container(
-                margin: EdgeInsets.only(bottom: isLast ? 0 : 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(s['date']!,
-                            style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary)),
-                        Text(s['reporter']!,
-                            style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: AppColors.textTertiary)),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(s['address']!,
-                        style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.onSurface)),
-                    const SizedBox(height: 3),
-                    Text(s['desc']!,
-                        style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: AppColors.textSecondary)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Container(
+              margin: EdgeInsets.only(bottom: ultimo ? 0 : 8),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(s.address,
+                            style: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w700)),
+                      ),
+                      Text(
+                        Formatters.tempoRelativo(s.createdAt, DateTime.now()),
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.textTertiary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text('Visto por $quem',
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary)),
+                  if (s.notes.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(s.notes, style: const TextStyle(fontSize: 13)),
                   ],
-                ),
+                  if (s.photoUrl != null) ...[
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: SizedBox(
+                        height: 120,
+                        width: double.infinity,
+                        child: PetImage(url: s.photoUrl, iconSize: 32),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildActions(BuildContext context, PostModel post) {
+  Widget _caixa(String texto, {Widget? acao}) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+      constraints: const BoxConstraints(minHeight: 56),
       decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(texto,
+                style: const TextStyle(
+                    fontSize: 13, color: AppColors.textSecondary)),
+          ),
+          if (acao != null) acao,
+        ],
+      ),
+    );
+  }
+
+  /// Barra de ações: autor (resolver/excluir) ou visitante ("Eu vi").
+  Widget? _acoes(bool jaAvistei) {
+    final List<Widget> botoes;
+    if (_souAutor) {
+      botoes = [
+        OutlinedButton.icon(
+          onPressed: _ocupado ? null : _excluir,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 52),
+            foregroundColor: AppColors.primary,
+          ),
+          icon: const Icon(Icons.delete_outline, size: 18),
+          label: const Text('Excluir'),
+        ),
+        if (!_post.isResolved) ...[
+          const SizedBox(width: 8),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _ocupado ? null : _marcarResolvido,
+              icon: const Icon(Icons.check_circle_outline, size: 18),
+              label: const Text('Marcar como resolvido'),
+            ),
+          ),
+        ],
+      ];
+    } else if (!_post.isResolved) {
+      botoes = [
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: jaAvistei ? null : _euVi,
+            icon: Icon(jaAvistei ? Icons.check : Icons.visibility, size: 18),
+            label: Text(jaAvistei
+                ? 'Você já registrou um avistamento'
+                : 'Eu vi este pet'),
+          ),
+        ),
+      ];
+    } else {
+      return null;
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      decoration: const BoxDecoration(
         color: AppColors.surface,
         border: Border(top: BorderSide(color: AppColors.divider)),
       ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => ChatScreen(post: post)),
-                );
-              },
-              icon: const Icon(Icons.chat_bubble_outline, size: 16),
-              label: const Text('Chat'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(0, 50),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.primary),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () => _showEuViSheet(context, post),
-                icon: const Icon(Icons.visibility, size: 16),
-                label: const Text('Eu Vi este Pet'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showEuViSheet(BuildContext context, PostModel post) {
-    final addressController = TextEditingController();
-    final notesController = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            top: 24,
-            left: 20,
-            right: 20,
-          ),
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.divider,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Registrar Avistamento',
-                  style: GoogleFonts.inter(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Sua informação ajuda o tutor. Você ganha +15 pontos.',
-                  style: GoogleFonts.inter(
-                      fontSize: 13, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 24),
-                Text('Onde você o viu?',
-                    style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: AppColors.onSurface)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: addressController,
-                  decoration: InputDecoration(
-                    hintText: 'Ex: Próximo à praça central...',
-                    prefixIcon: const Icon(Icons.location_on_outlined,
-                        color: AppColors.primary, size: 18),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text('Detalhes (opcional)',
-                    style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: AppColors.onSurface)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: notesController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    hintText: 'Ex: Parecia assustado, correu para um beco...',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                GestureDetector(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Foto anexada!')),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.divider),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.camera_alt_outlined,
-                            color: AppColors.textTertiary, size: 18),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Anexar foto do pet',
-                          style: GoogleFonts.inter(
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (addressController.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Informe a localização!')),
-                        );
-                        return;
-                      }
-                      
-                      // Chama o PostService diretamente
-                      PostService.incrementSighting(post.id);
-                      DadosGlobais.pontosUsuario += 15;
-                      
-                      setState(() {
-                        _currentPost = _currentPost.copyWith(
-                          sightingsCount: _currentPost.sightingsCount + 1,
-                        );
-                      });
-
-                      Navigator.pop(context);
-                      _showSuccessDialog(context);
-                    },
-                    child: const Text('Registrar e Ajudar'),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showSuccessDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20)),
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDF4),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: const Icon(Icons.check_rounded,
-                      color: Color(0xFF16A34A), size: 32),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Obrigado!',
-                  style: GoogleFonts.inter(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'O tutor foi notificado sobre o avistamento.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                      fontSize: 14, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFFBEB),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFFDE68A)),
-                  ),
-                  child: Text(
-                    '+15 pontos ganhos!',
-                    style: GoogleFonts.inter(
-                      color: const Color(0xFF92400E),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Ótimo!'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      child: SafeArea(top: false, child: Row(children: botoes)),
     );
   }
 }

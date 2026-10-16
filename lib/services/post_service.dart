@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/post_model.dart';
+import '../models/sighting_model.dart';
+import 'storage_service.dart';
 
 class PostService {
   static final _db = FirebaseFirestore.instance;
@@ -41,10 +43,64 @@ class PostService {
     await _db.collection(_col).doc(post.id).set(post.toMap());
   }
 
-  static Future<void> incrementSighting(String postId) async {
-    await _db.collection(_col).doc(postId).update({
-      'sightingsCount': FieldValue.increment(1),
-      'helpersCount': FieldValue.increment(1),
-    });
+  // ---------------------------------------------------------------------------
+  // Avistamentos (posts/{id}/sightings/{uid})
+  // ---------------------------------------------------------------------------
+
+  static CollectionReference<Map<String, dynamic>> _avistamentos(
+          String postId) =>
+      _db.collection(_col).doc(postId).collection('sightings');
+
+  /// Avistamentos do post em tempo real, mais recentes primeiro.
+  static Stream<List<SightingModel>> avistamentosStream(String postId) {
+    return _avistamentos(postId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => [
+              for (final doc in snap.docs)
+                SightingModel.fromMap({...doc.data(), 'userId': doc.id}),
+            ]);
+  }
+
+  /// Registra o avistamento e soma +1 nos contadores do post, juntos (batch).
+  /// O documento usa o uid como id: as regras impedem um segundo registro.
+  static Future<void> registrarAvistamento(
+      String postId, SightingModel avistamento) async {
+    final batch = _db.batch()
+      ..set(_avistamentos(postId).doc(avistamento.userId), avistamento.toMap())
+      ..update(_db.collection(_col).doc(postId), {
+        'sightingsCount': FieldValue.increment(1),
+        'helpersCount': FieldValue.increment(1),
+      });
+    await batch.commit();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Ações do autor
+  // ---------------------------------------------------------------------------
+
+  static Future<void> marcarResolvido(String postId) =>
+      _db.collection(_col).doc(postId).update({'isResolved': true});
+
+  /// Exclui o post, os avistamentos dele e as fotos no Storage.
+  static Future<void> excluirPost(PostModel post) async {
+    final avistamentos = await _avistamentos(post.id).get();
+    final fotos = <String>[
+      if (post.photoUrl != null) post.photoUrl!,
+      for (final doc in avistamentos.docs)
+        if (doc.data()['photoUrl'] is String) doc.data()['photoUrl'] as String,
+    ];
+
+    final batch = _db.batch();
+    for (final doc in avistamentos.docs) {
+      batch.delete(doc.reference);
+    }
+    batch.delete(_db.collection(_col).doc(post.id));
+    await batch.commit();
+
+    // Fotos por último: se alguma falhar, o post já foi removido.
+    for (final url in fotos) {
+      await StorageService.apagarPorUrl(url);
+    }
   }
 }

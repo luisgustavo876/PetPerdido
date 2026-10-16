@@ -1,16 +1,51 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function logado() {
+      return request.auth != null;
+    }
+
+    // ------------------------------------------------------------------
+    // Posts: leitura pública; só o autor cria, edita e apaga.
+    // Outros usuários só somam +1 nos contadores ao registrar "Eu vi".
+    // ------------------------------------------------------------------
     match /posts/{postId} {
       allow read: if true;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null && (
-        resource.data.userId == request.auth.uid ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sightingsCount','helpersCount']));
-      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if logado() && request.resource.data.userId == request.auth.uid;
+      allow update: if logado() && (
+        resource.data.userId == request.auth.uid || registraAvistamento());
+      allow delete: if logado() && resource.data.userId == request.auth.uid;
+
+      // "Eu vi": só sightingsCount e helpersCount, exatamente +1, e no mesmo
+      // batch em que o usuário cria o próprio avistamento (que ainda não existia).
+      function registraAvistamento() {
+        let avistamento = /databases/$(database)/documents/posts/$(postId)/sightings/$(request.auth.uid);
+        return request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['sightingsCount', 'helpersCount'])
+          && request.resource.data.sightingsCount == resource.data.get('sightingsCount', 0) + 1
+          && request.resource.data.helpersCount == resource.data.get('helpersCount', 0) + 1
+          && !exists(avistamento)
+          && existsAfter(avistamento);
+      }
+
+      // Avistamentos: o id do documento é o uid de quem viu (1 por pessoa).
+      match /sightings/{uid} {
+        allow read: if true;
+        allow create: if logado() && uid == request.auth.uid
+          && request.resource.data.userId == request.auth.uid;
+        // Quem registrou ou o autor do post (ao excluir o post).
+        allow delete: if logado() && (
+          resource.data.userId == request.auth.uid
+          || get(/databases/$(database)/documents/posts/$(postId)).data.userId == request.auth.uid);
+      }
     }
+
+    // ------------------------------------------------------------------
+    // Users: cada usuário só acessa o próprio documento (protege o CPF).
+    // ------------------------------------------------------------------
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if logado() && request.auth.uid == userId;
     }
   }
 }

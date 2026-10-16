@@ -1,3 +1,5 @@
+import '../models/post_model.dart';
+
 /// Funções de texto e formatação (puras e testáveis).
 class Formatters {
   Formatters._();
@@ -36,5 +38,22 @@ class Formatters {
     }
     if (km < 10) return 'a ${km.toStringAsFixed(1).replaceAll('.', ',')} km';
     return 'a ${km.round()} km';
+  }
+
+  /// Texto do "Compartilhar": tipo, pet, descrição, bairro e o nome do app.
+  /// Só dados públicos do post (nada de e-mail, CPF ou coordenadas).
+  static String textoCompartilhar(PostModel post) {
+    final nome = post.petName.isNotEmpty && post.petName != 'Sem nome'
+        ? '${post.petName} — '
+        : '';
+    final caracteristicas = [
+      post.species,
+      if (post.breed.isNotEmpty) post.breed,
+      ...post.colors,
+    ].join(', ');
+    return '${post.type.label.toUpperCase()}: $nome$caracteristicas\n'
+        '${post.description}\n'
+        'Região: ${post.lastSeenAddress}\n\n'
+        'Viu este pet? Ajude pelo app PetPerdido.';
   }
 }

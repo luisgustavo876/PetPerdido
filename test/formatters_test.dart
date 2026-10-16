@@ -39,6 +39,24 @@ void main() {
     });
   });
 
+  group('textoCompartilhar', () {
+    test('tem tipo, pet, descrição, bairro e o nome do app', () {
+      final texto = Formatters.textoCompartilhar(postDeTeste(
+          colors: ['Preto'], description: 'Sumiu perto da praça.'));
+      expect(texto, contains('PERDI MEU PET: Pipoca'));
+      expect(texto, contains('Preto'));
+      expect(texto, contains('Sumiu perto da praça.'));
+      expect(texto, contains('Região: Centro, Itapetininga'));
+      expect(texto, contains('PetPerdido'));
+    });
+
+    test('não expõe coordenadas nem link falso', () {
+      final texto = Formatters.textoCompartilhar(postDeTeste());
+      expect(texto, isNot(contains('-23.59')));
+      expect(texto, isNot(contains('http')));
+    });
+  });
+
   group('PostFilter.buscaCorresponde', () {
     final post = postDeTeste(
       petName: 'Pipoca',

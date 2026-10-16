@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../../core/app_colors.dart';
 import '../../../models/post_model.dart';
+import '../../../widgets/seletor_imagem.dart';
 import '../post_draft.dart';
 import 'post_form_ui.dart';
 
@@ -19,46 +19,10 @@ class StepFoto extends StatelessWidget {
         PostType.sighted => 'Se conseguiu tirar uma foto, ela ajuda bastante.',
       };
 
-  /// Pergunta de onde vem a foto (câmera só fora da Web) e abre o seletor.
+  /// Abre o seletor (câmera só fora da Web, ou galeria).
   Future<void> _escolherFoto(BuildContext context) async {
-    final origem = await showModalBottomSheet<ImageSource>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!kIsWeb)
-                ListTile(
-                  leading: const Icon(Icons.photo_camera_outlined,
-                      color: AppColors.primary),
-                  title: const Text('Tirar foto'),
-                  onTap: () => Navigator.pop(ctx, ImageSource.camera),
-                ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined,
-                    color: AppColors.primary),
-                title: const Text('Escolher da galeria'),
-                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (origem == null) return;
-
     try {
-      final imagem = await ImagePicker().pickImage(
-        source: origem,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 85,
-      );
+      final imagem = await SeletorImagem.escolher(context);
       if (imagem == null) return;
       draft.imageFile = imagem;
       draft.imageBytes = await imagem.readAsBytes();

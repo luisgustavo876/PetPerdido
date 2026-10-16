@@ -12,8 +12,8 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
 | — | 0 Limpeza · 1 Regras · 2 Login/Cadastro · 3 Criar Post | ✅ Feito |
 | 1 | 4 Mapa | ✅ Feito |
 | 1 | 5 Feed | ✅ Feito |
-| 1 | 6 Detalhe | ⏳ Em andamento |
-| 2 | IA (Gemini) | Pendente |
+| 1 | 6 Detalhe | ✅ Feito |
+| 2 | IA (Gemini) | ⏳ Em andamento |
 | 3 | Geofencing + Push | Pendente |
 | 4 | 7 Pontos e recompensas | Pendente |
 | 5 | 8 Chat | Pendente |
@@ -35,6 +35,10 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
   filtros (tipo, espécie, porte, cor, favoritos, resolvidos) e ordem "Mais recentes" / "Mais perto
   de mim"; cards com "há 2 h · a 1,2 km"; estados vazio/erro. "Possíveis correspondências" na
   revisão do criar post (`Similaridade`, função pura testada).
+- **Módulo 6** — detalhe com "Eu vi este pet" real (bairro automático, observações, foto opcional) em
+  `posts/{id}/sightings/{uid}` + contadores no mesmo batch; linha do tempo real; favoritar
+  (`users/{uid}.favorites`); compartilhar (share_plus); autor marca como resolvido e exclui
+  (post + avistamentos + fotos). Regras publicadas e validadas por REST (28/28, tudo limpo).
 
 ## Decisões de implementação
 
@@ -54,6 +58,15 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
 - Favoritos no feed são lidos uma vez (e de novo ao voltar do Detalhe), para manter um só stream na tela.
 - O botão "Conversar" saiu do card até o chat real existir (Fase 5).
 - O `PetPostCard` não usa mais `GoogleFonts` direto (a fonte vem do tema) — assim dá para testá-lo.
+- **Avistamentos:** o id do documento é o uid de quem viu → no máximo 1 por pessoa por post (as regras
+  negam o segundo). Um não-autor só altera `sightingsCount`/`helpersCount`, exatamente +1, e só no mesmo
+  batch em que cria o próprio avistamento (`existsAfter`). O autor do post pode apagar avistamentos
+  (necessário para "Excluir post"). Coordenadas do avistamento arredondadas; se o bairro digitado não
+  for encontrado, o avistamento é salvo sem coordenadas.
+- Fotos de avistamento ficam em `posts/{postId}/avistamento_{uid}.jpg` (mesma regra do Storage dos posts).
+- Regras: publico com `firebase deploy --only firestore:rules` (após `--dry-run`) e valido logo em
+  seguida por REST com 2 usuários de teste; tudo é apagado no fim.
+- Build Android: se aparecer `mergeExtDexDebug` falhando, rodar de novo (erro passageiro do Gradle).
 
 ## Passos manuais pendentes (dependem de você)
 
