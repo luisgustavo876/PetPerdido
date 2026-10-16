@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
-import '../../core/dados_globais.dart';
-import '../../models/post_model.dart';
-import '../../services/post_service.dart';
-import '../../widgets/pet_image.dart';
+import '../../core/formatters.dart';
+import '../../models/chat_model.dart';
+import '../../services/auth_service.dart';
+import '../../services/chat_service.dart';
 import 'chat_screen.dart';
 
+/// Lista de conversas em tempo real (mais recentes primeiro), com a última
+/// mensagem e o número de não lidas.
 class ChatsScreen extends StatefulWidget {
   const ChatsScreen({super.key});
 
@@ -14,161 +16,144 @@ class ChatsScreen extends StatefulWidget {
 }
 
 class _ChatsScreenState extends State<ChatsScreen> {
+  /// Stream único da tela, criado no initState.
+  late Stream<List<ChatModel>> _stream;
+
+  @override
+  void initState() {
+    super.initState();
+    _stream = ChatService.minhasConversas();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Minhas Conversas'),
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.onSurface,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: Colors.grey[200], height: 1),
-        ),
+    final eu = AuthService.currentUser?.uid ?? '';
+    return StreamBuilder<List<ChatModel>>(
+      stream: _stream,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _estado(
+            Icons.cloud_off,
+            'Não foi possível carregar as conversas.',
+            acao: ElevatedButton(
+              onPressed: () =>
+                  setState(() => _stream = ChatService.minhasConversas()),
+              child: const Text('Tentar de novo'),
+            ),
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final conversas = snapshot.data!;
+        if (conversas.isEmpty) {
+          return _estado(
+            Icons.chat_bubble_outline,
+            'Nenhuma conversa ainda.\nAbra um post e toque em "Entrar em contato".',
+          );
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: conversas.length,
+          separatorBuilder: (_, __) => const Divider(height: 1, indent: 72),
+          itemBuilder: (context, i) => _item(conversas[i], eu),
+        );
+      },
+    );
+  }
+
+  Widget _item(ChatModel c, String eu) {
+    final naoLidas = c.naoLidas(eu);
+    final nome = c.nomeDoOutro(eu);
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ChatScreen(chat: c)),
       ),
-      body: StreamBuilder<List<PostModel>>(
-        stream: PostService.postsStream(),
-        builder: (context, snapshot) {
-          final posts = snapshot.data ?? [];
-          // Filtrar os posts que possuem histórico de chat
-          final chatPosts = posts.where((post) {
-            return DadosGlobais.chats.containsKey(post.id);
-          }).toList();
-
-          if (chatPosts.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.chat_bubble_outline, size: 60, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'Nenhuma conversa ativa no momento',
-                    style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
-                  ),
-                ],
+      leading: CircleAvatar(
+        radius: 24,
+        backgroundColor: AppColors.primarySurface,
+        child: Text(nome.isNotEmpty ? nome[0].toUpperCase() : '?',
+            style: const TextStyle(
+                fontWeight: FontWeight.w800, color: AppColors.primary)),
+      ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(nome,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontWeight: naoLidas > 0 ? FontWeight.w800 : FontWeight.w600)),
+          ),
+          if (c.lastMessageAt != null)
+            Text(
+              Formatters.tempoRelativo(c.lastMessageAt!, DateTime.now()),
+              style: TextStyle(
+                fontSize: 11,
+                color: naoLidas > 0 ? AppColors.primary : AppColors.textTertiary,
               ),
-            );
-          }
-
-          return ListView.separated(
-            itemCount: chatPosts.length,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF0F0F0)),
-            itemBuilder: (context, index) {
-              final post = chatPosts[index];
-              final messages = DadosGlobais.chats[post.id] ?? [];
-              final hasMessages = messages.isNotEmpty;
-
-              final lastMsg = hasMessages ? messages.last['message'] as String : 'Nenhuma mensagem';
-              final rawTime = hasMessages ? messages.last['createdAt'] as DateTime : post.createdAt;
-              final timeAgo = _timeAgo(rawTime);
-
-              return InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChatScreen(post: post),
-                    ),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      // Avatar circular do Pet com patinha sobreposta
-                      Stack(
-                        children: [
-                          Container(
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.grey[200],
-                              border: Border.all(color: Colors.grey[100]!, width: 2),
-                            ),
-                            child: ClipOval(
-                              child: PetImage(url: post.photoUrl, iconSize: 24),
-                            ),
-                          ),
-                          Positioned(
-                            right: 0,
-                            bottom: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: AppColors.primary,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.pets,
-                                color: Colors.white,
-                                size: 10,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    '${post.petName.isNotEmpty && post.petName != 'Sem nome' ? post.petName : 'Sem nome'} (${post.userName})',
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.onSurface,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                Text(
-                                  timeAgo,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              lastMsg,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey[600],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+            ),
+        ],
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(c.postTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: AppColors.primary)),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  c.lastMessage.isEmpty ? 'Conversa iniciada' : c.lastMessage,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: naoLidas > 0 ? AppColors.onSurface : AppColors.textSecondary,
+                    fontWeight: naoLidas > 0 ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
-              );
-            },
-          );
-        },
+              ),
+              if (naoLidas > 0)
+                Container(
+                  margin: const EdgeInsets.only(left: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text('$naoLidas',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700)),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  String _timeAgo(DateTime date) {
-    final diff = DateTime.now().difference(date);
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-    if (diff.inHours < 24) return '${diff.inHours}h';
-    return '${diff.inDays}d';
+  Widget _estado(IconData icone, String texto, {Widget? acao}) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icone, size: 48, color: AppColors.textTertiary),
+            const SizedBox(height: 16),
+            Text(texto,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textSecondary)),
+            if (acao != null) ...[const SizedBox(height: 16), acao],
+          ],
+        ),
+      ),
+    );
   }
 }

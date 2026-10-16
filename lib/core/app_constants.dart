@@ -40,6 +40,9 @@ class AppConstants {
   /// Ao voltar do segundo plano, só atualiza a localização se passou este tempo.
   static const Duration alertaIntervaloAtualizacao = Duration(minutes: 15);
 
+  // Chat: mensagens somem depois de 15 dias (filtro no app + política TTL)
+  static const Duration chatValidade = Duration(days: 15);
+
   // Aviso de posts semelhantes (Perdi x Achei/Avistei)
   static const int similarWindowDays = 7;
   static const double similarMaxKm = 3;

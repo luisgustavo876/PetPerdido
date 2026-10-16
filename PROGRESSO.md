@@ -16,8 +16,8 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
 | 2 | IA (Gemini) | ✅ Feito (falta você ativar o AI Logic no console) |
 | 3 | Geofencing + Push | ✅ Código pronto · ⏸️ deploy da Function espera sua autorização |
 | 4 | 7 Pontos e recompensas | ✅ Feito |
-| 5 | 8 Chat | ⏳ Em andamento |
-| 6 | 9 Configurações, perfil e LGPD | Pendente |
+| 5 | 8 Chat | ✅ Feito (falta você criar a política TTL) |
+| 6 | 9 Configurações, perfil e LGPD | ⏳ Em andamento |
 | 7 | Fechamento | Pendente |
 
 ## Feito
@@ -55,6 +55,12 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
   "Como ganhar pontos"; histórico; catálogo de recompensas de exemplo ("Exemplo de parceria", sem
   marcas); resgate em transação que confere o saldo e gera o código do voucher; "Meus resgates".
   `DadosGlobais` não guarda mais pontos. Regras validadas por REST (18/18).
+- **Módulo 8** — chat real: "Entrar em contato" no Detalhe abre/cria a conversa com id
+  determinístico (`postId_uidA_uidB`), sem conversar consigo mesmo; lista de conversas em tempo real
+  (mais recentes primeiro, última mensagem, não lidas); chat com texto e foto (Storage
+  `chats/{chatId}/`, até 5 MB); filtro de palavrões (ao enviar e ao exibir); mensagens com mais de
+  15 dias escondidas e com `expireAt` para o TTL; só o nome do outro aparece. `DadosGlobais` foi
+  apagado. Regras do Firestore e do Storage validadas por REST com 3 usuários (35/35).
 
 ## Decisões de implementação
 
@@ -119,6 +125,21 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
 - **Recompensas:** catálogo fixo em `lib/core/recompensas.dart` (5 itens genéricos). Código do voucher
   `PET-XXXX-XXXX` sem caracteres que confundem (0/O, 1/I). É demonstração, sem validação no parceiro.
 - **Níveis:** Vizinho atento (0), Ajudante da rua (50), Protetor do bairro (150), Herói dos pets (300).
+- **Chat — id e regras:** o id é `postId_uidA_uidB` com os uids em ordem; as regras conferem esse
+  formato na criação e que são 2 pessoas diferentes. Depois de criada, só mudam `lastMessage`,
+  `lastMessageAt` e `unread`. Mensagens: só participantes leem; cada um cria em nome próprio.
+  Lista de conversas: `participants array-contains` e ordenação no app (sem índice composto).
+- **Chat — Storage sem IAM:** a regra de `chats/{chatId}/` verifica se o uid de quem pede está dentro
+  do `chatId` (que já foi validado no Firestore). Assim não precisa da regra cruzada Storage→Firestore,
+  que exigiria liberar permissão no IAM.
+- **Chat — link da foto:** como em todo o Firebase Storage, quem tiver a URL de download (com token)
+  consegue abrir a foto. A URL só fica gravada nas mensagens, que só os participantes leem.
+- **Palavrões:** lista em `lib/core/filtro_palavroes.dart`, comparação por palavra inteira, sem acento
+  e sem diferenciar maiúsculas; palavras ambíguas do dia a dia ("pau", "rola", "pinto") ficam de fora.
+- **15 dias:** o app esconde mensagens com mais de 15 dias e grava `expireAt` = envio + 15 dias para a
+  política TTL apagar do banco. (O INSTRUCTIONS fala em "15 dias de inatividade"; segui o roteiro:
+  15 dias por mensagem.)
+- O banner do chat orienta a combinar a entrega em local público e a não enviar endereço/CPF.
 
 ## Passos manuais pendentes (dependem de você)
 
@@ -127,6 +148,16 @@ O código está em `functions/` e testado localmente. O primeiro `firebase deplo
 também ativa no Google Cloud as APIs necessárias (Cloud Functions, Cloud Build, Artifact Registry,
 Eventarc, Cloud Run) — por isso precisa da sua autorização. Depois do deploy eu testo com 2 usuários
 de teste (um perto e um longe do post) e apago tudo.
+
+### Criar a política TTL das mensagens do chat
+1. Abra https://console.firebase.google.com/project/petperdido-ff844/firestore e vá na aba
+   **TTL** ("Time-to-live"). Se não aparecer, use o console do Google Cloud:
+   https://console.cloud.google.com/firestore/databases/-default-/ttl?project=petperdido-ff844
+2. Clique em **Criar política** ("Create policy").
+3. Em **Grupo de coleções** digite `messages`.
+4. Em **Campo de carimbo de data/hora** digite `expireAt`.
+5. Clique em **Criar**. Leva alguns minutos para ficar "Ativa". Depois disso o Firestore apaga
+   sozinho as mensagens vencidas (pode levar até 24 h após a data).
 
 ### Testar a notificação no seu celular Android
 1. Instale o app (`flutter run` com o celular conectado, ou o APK em

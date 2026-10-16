@@ -1,12 +1,30 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+
+    function imagemAte5MB() {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // Fotos dos posts e dos avistamentos: leitura pública.
     match /posts/{postId}/{fileName} {
       allow read: if true;
-      allow create, update: if request.auth != null
-        && request.resource.contentType.matches('image/.*')
-        && request.resource.size < 5 * 1024 * 1024;
+      allow create, update: if request.auth != null && imagemAte5MB();
       allow delete: if request.auth != null;
     }
+
+    // Fotos do chat: só os participantes. O chatId é "postId_uidA_uidB"
+    // (conferido pelas regras do Firestore ao criar a conversa), então
+    // participar = ter o próprio uid dentro do chatId.
+    match /chats/{chatId}/{fileName} {
+      function participante() {
+        return request.auth != null && request.auth.uid in chatId.split('_');
+      }
+      allow read, delete: if participante();
+      allow create: if participante() && imagemAte5MB();
+    }
+
+    // Todo o resto do bucket fica bloqueado.
   }
 }

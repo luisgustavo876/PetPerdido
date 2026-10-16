@@ -8,10 +8,12 @@ import '../../core/post_type_style.dart';
 import '../../models/post_model.dart';
 import '../../models/sighting_model.dart';
 import '../../services/auth_service.dart';
+import '../../services/chat_service.dart';
 import '../../services/pontos_service.dart';
 import '../../services/post_service.dart';
 import '../../services/user_service.dart';
 import '../../widgets/pet_image.dart';
+import '../chat/chat_screen.dart';
 import 'widgets/eu_vi_sheet.dart';
 
 /// Detalhe do post: dados do pet, avistamentos reais, favoritar,
@@ -137,6 +139,25 @@ class _DetailScreenState extends State<DetailScreen> {
       if (!mounted) return;
       setState(() => _ocupado = false);
       _mensagem('Não foi possível excluir. Tente novamente.');
+    }
+  }
+
+  /// "Entrar em contato": abre (ou cria) a conversa com quem publicou.
+  Future<void> _entrarEmContato() async {
+    setState(() => _ocupado = true);
+    try {
+      final chat = await ChatService.abrirOuCriar(_post);
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ChatScreen(chat: chat)),
+      );
+    } on ChatException catch (e) {
+      _mensagem(e.mensagem);
+    } catch (_) {
+      _mensagem('Não foi possível abrir a conversa. Tente novamente.');
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
     }
   }
 
@@ -664,20 +685,26 @@ class _DetailScreenState extends State<DetailScreen> {
           ),
         ],
       ];
-    } else if (!_post.isResolved) {
-      botoes = [
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: jaAvistei ? null : _euVi,
-            icon: Icon(jaAvistei ? Icons.check : Icons.visibility, size: 18),
-            label: Text(jaAvistei
-                ? 'Você já registrou um avistamento'
-                : 'Eu vi este pet'),
-          ),
-        ),
-      ];
     } else {
-      return null;
+      final contato = OutlinedButton.icon(
+        onPressed: _ocupado ? null : _entrarEmContato,
+        style: OutlinedButton.styleFrom(minimumSize: const Size(0, 52)),
+        icon: const Icon(Icons.chat_bubble_outline, size: 18),
+        label: const Text('Entrar em contato'),
+      );
+      botoes = _post.isResolved
+          ? [Expanded(child: contato)]
+          : [
+              contato,
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: jaAvistei ? null : _euVi,
+                  icon: Icon(jaAvistei ? Icons.check : Icons.visibility, size: 18),
+                  label: Text(jaAvistei ? 'Já registrado' : 'Eu vi este pet'),
+                ),
+              ),
+            ];
     }
 
     return Container(

@@ -42,6 +42,46 @@ service cloud.firestore {
     }
 
     // ------------------------------------------------------------------
+    // Chats: só os 2 participantes leem e escrevem na própria conversa.
+    // O id é "postId_uidA_uidB" (uids em ordem) — conferido na criação.
+    // ------------------------------------------------------------------
+    match /chats/{chatId} {
+      function participante() {
+        return logado() && request.auth.uid in resource.data.participants;
+      }
+
+      // get de conversa que ainda não existe (o app confere antes de criar).
+      allow get: if logado() && (resource == null || request.auth.uid in resource.data.participants);
+      // list só com o filtro "participants array-contains meu uid".
+      allow list: if logado() && request.auth.uid in resource.data.participants;
+
+      allow create: if logado()
+        && request.resource.data.participants.size() == 2
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.participants[0] < request.resource.data.participants[1]
+        && chatId == request.resource.data.postId + '_'
+             + request.resource.data.participants[0] + '_'
+             + request.resource.data.participants[1];
+
+      // Só a prévia da última mensagem e os contadores de não lidas mudam.
+      allow update: if participante()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['lastMessage', 'lastMessageAt', 'unread']);
+
+      allow delete: if participante();
+
+      match /messages/{mensagemId} {
+        function participanteDoChat() {
+          return logado() && request.auth.uid in
+            get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        }
+        allow read: if participanteDoChat();
+        allow create: if participanteDoChat() && request.resource.data.senderId == request.auth.uid;
+        allow delete: if participanteDoChat() && resource.data.senderId == request.auth.uid;
+      }
+    }
+
+    // ------------------------------------------------------------------
     // Users: cada usuário só acessa o próprio documento (protege o CPF).
     // ------------------------------------------------------------------
     match /users/{userId} {
