@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/app_constants.dart';
+import 'core/app_navigation.dart';
 import 'core/app_routes.dart';
 import 'core/app_theme.dart';
 import 'firebase_options.dart';
@@ -26,6 +27,9 @@ class PetPerdidoApp extends StatelessWidget {
     return MaterialApp(
       title: AppConstants.appName,
       theme: AppTheme.lightTheme,
+      // Permitem abrir telas e avisos a partir de serviços (ex.: push).
+      navigatorKey: AppNavigation.navigatorKey,
+      scaffoldMessengerKey: AppNavigation.messengerKey,
       debugShowCheckedModeBanner: false,
       // App inteiro em português do Brasil (calendário, botões padrão etc.)
       localizationsDelegates: const [

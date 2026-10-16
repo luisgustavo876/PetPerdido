@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../core/dados_globais.dart';
+import '../../services/alerta_service.dart';
 import '../../services/auth_service.dart';
 
 /// Tela de Configurações e Perfil do usuário.
@@ -200,7 +201,7 @@ class SettingsScreen extends StatelessWidget {
             onPressed: () async {
               Navigator.pop(context); // Fecha o dialog
               Navigator.pop(context); // Fecha a settings screen
-              await AuthService.signOut(); // Firebase signOut — redireciona via AuthGate
+              await AlertaService.sair(); // tira o token do push e sai (AuthGate redireciona)
             },
             child: const Text('Sair',
                 style: TextStyle(color: Colors.white)),

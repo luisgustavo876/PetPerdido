@@ -20,6 +20,8 @@ dependencies:
   firebase_storage: ^12.3.0
   # IA (Gemini) pelo Firebase AI Logic — sem chave de API no app
   firebase_ai: ^2.3.0
+  # Notificações push (alertas de pets por perto)
+  firebase_messaging: ^15.2.10
 
   # Mapa
   google_maps_flutter: ^2.5.3

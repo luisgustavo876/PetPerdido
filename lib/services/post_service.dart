@@ -39,6 +39,18 @@ class PostService {
   static Future<List<PostModel>> postsRecentes() async =>
       _converter(await _recentes.get());
 
+  /// Um post pelo id (ex.: ao abrir uma notificação). Null se não existir.
+  static Future<PostModel?> buscarPost(String id) async {
+    final snap = await _db.collection(_col).doc(id).get();
+    final dados = snap.data();
+    if (dados == null) return null;
+    try {
+      return PostModel.fromMap({...dados, 'id': snap.id});
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<void> createPost(PostModel post) async {
     await _db.collection(_col).doc(post.id).set(post.toMap());
   }

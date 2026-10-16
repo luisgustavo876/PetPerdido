@@ -1,0 +1,19 @@
+{
+  "name": "petperdido-functions",
+  "description": "Cloud Functions do PetPerdido (alertas por proximidade)",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "firebase-functions": "^7.4.0",
+    "geofire-common": "^6.0.0"
+  }
+}

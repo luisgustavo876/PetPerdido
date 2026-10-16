@@ -14,8 +14,8 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
 | 1 | 5 Feed | ✅ Feito |
 | 1 | 6 Detalhe | ✅ Feito |
 | 2 | IA (Gemini) | ✅ Feito (falta você ativar o AI Logic no console) |
-| 3 | Geofencing + Push | ⏳ Em andamento |
-| 4 | 7 Pontos e recompensas | Pendente |
+| 3 | Geofencing + Push | ✅ Código pronto · ⏸️ deploy da Function espera sua autorização |
+| 4 | 7 Pontos e recompensas | ⏳ Em andamento |
 | 5 | 8 Chat | Pendente |
 | 6 | 9 Configurações, perfil e LGPD | Pendente |
 | 7 | Fechamento | Pendente |
@@ -43,6 +43,13 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
   `responseSchema`) e "Preencher a partir da descrição" para Avistei sem foto. Sugestões com selo
   "Sugerido pela IA" na etapa Pet, sempre editáveis. Erros tratados (offline, cota, API desativada,
   resposta inválida, "não é um pet"). Conversor puro `SugestaoIA.converter` com testes.
+- **Módulo Geofencing** — app: `firebase_messaging`, permissão POST_NOTIFICATIONS, canal
+  `alertas_pets` (criado na `MainActivity`), aviso de LGPD antes de pedir a localização, gravação de
+  `lastLocation` (arredondada, com geohash) e `fcmToken` ao abrir e ao voltar do segundo plano,
+  toque na notificação abre o post, banner dentro do app, sino com contador e tela "Alertas".
+  Cloud Function `alertarProximos` em `functions/` (Node 22, southamerica-east1) com lógica pura
+  testada (`npm test`, 9 testes). Regras de `users/{uid}/notifications` publicadas e validadas (13/13).
+  **Falta:** deploy da Function (precisa da sua autorização) e o teste ponta a ponta.
 
 ## Decisões de implementação
 
@@ -83,8 +90,41 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
   (espécie, porte, até 2 cores, características); raça limitada a 40 caracteres.
 - O pacote `firebase_ai` só exporta a classe base de erro; o tipo (cota, API desativada) é reconhecido
   pela mensagem em `AIService.mensagemDeErro` (testada).
+- **Geofencing — consentimento:** `alertsEnabled` só é gravado depois do aviso de LGPD (aceitou = true,
+  "Agora não" = false). Sem resposta (campo ausente) o app pergunta ao abrir. Assim ninguém recebe
+  alertas nem tem a localização guardada sem ter concordado. O raio padrão é 3 km.
+- **Geofencing — quando atualiza:** ao abrir o app e ao voltar do segundo plano (no máximo a cada
+  15 min). Nunca rastreamento contínuo. A localização é a última conhecida.
+- **Geofencing — Function:** busca por faixas de geohash com o maior raio (10 km) em
+  `users.lastLocation.geohash` (índice simples, automático), filtra pela distância exata ≤ raio de cada
+  usuário, exclui o autor e quem desligou. Grava `users/{uid}/notifications` e envia push com
+  `sendEachForMulticast` (lotes de 500), apagando tokens inválidos. Região southamerica-east1 = mesma
+  do Firestore. `firebase-functions` 7.4, `firebase-admin` 14.5, `geofire-common` 6.0, Node 22 (o mais
+  novo na lista de runtimes do Cloud Functions em 16/10/2026).
+- **Notificações:** só a Function cria (Admin SDK); o dono lê, apaga e muda apenas o campo `read`.
+- **Push na Web e no iOS:** fora do escopo. Na Web o serviço de alertas não roda (precisaria de chave
+  VAPID e service worker); no iOS o push exige chave APNs (conta Apple Developer).
+- Ao sair da conta, o `fcmToken` é apagado do `users/{uid}` (o aparelho para de receber os alertas
+  daquela conta).
 
 ## Passos manuais pendentes (dependem de você)
+
+### Autorizar o deploy da Cloud Function dos alertas
+O código está em `functions/` e testado localmente. O primeiro `firebase deploy --only functions`
+também ativa no Google Cloud as APIs necessárias (Cloud Functions, Cloud Build, Artifact Registry,
+Eventarc, Cloud Run) — por isso precisa da sua autorização. Depois do deploy eu testo com 2 usuários
+de teste (um perto e um longe do post) e apago tudo.
+
+### Testar a notificação no seu celular Android
+1. Instale o app (`flutter run` com o celular conectado, ou o APK em
+   `build/app/outputs/flutter-apk/app-debug.apk`).
+2. Entre com a sua conta. No aviso "Alertas de pets perto de você", toque em **Ativar alertas** e
+   permita **notificações** e **localização**.
+3. Em outro aparelho (ou no Chrome, com outra conta), crie um post a menos de 3 km de onde você está.
+4. Em até alguns segundos deve chegar a notificação "Pet perdido perto de você" (ou encontrado/avistado).
+   - Com o app **fechado ou em segundo plano**: aparece na barra; ao tocar, abre o post.
+   - Com o app **aberto**: aparece um banner no topo com "Ver".
+5. O sino (no topo da tela principal) mostra o alerta e o contador de não lidas.
 
 ### Ativar o Firebase AI Logic (necessário para "Preencher com IA")
 Hoje a API responde 403 "Firebase AI Logic API has not been used ... or it is disabled".

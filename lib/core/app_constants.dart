@@ -33,6 +33,13 @@ class AppConstants {
   static const String geminiModel = 'gemini-3.5-flash';
   static const int iaMaxPixels = 1024;
 
+  // Alertas por proximidade (geofencing + push)
+  static const List<int> alertRadiosKm = [1, 3, 5, 10];
+  static const int alertRadiusPadraoKm = 3;
+
+  /// Ao voltar do segundo plano, só atualiza a localização se passou este tempo.
+  static const Duration alertaIntervaloAtualizacao = Duration(minutes: 15);
+
   // Aviso de posts semelhantes (Perdi x Achei/Avistei)
   static const int similarWindowDays = 7;
   static const double similarMaxKm = 3;

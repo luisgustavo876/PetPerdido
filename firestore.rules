@@ -46,6 +46,14 @@ service cloud.firestore {
     // ------------------------------------------------------------------
     match /users/{userId} {
       allow read, write: if logado() && request.auth.uid == userId;
+
+      // Alertas: criados só pela Cloud Function (Admin SDK, fora das regras).
+      // O dono lê, apaga e marca como lida (só o campo "read").
+      match /notifications/{notificacaoId} {
+        allow read, delete: if logado() && request.auth.uid == userId;
+        allow update: if logado() && request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      }
     }
   }
 }
