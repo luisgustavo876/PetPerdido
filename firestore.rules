@@ -13,8 +13,11 @@ service cloud.firestore {
     match /posts/{postId} {
       allow read: if true;
       allow create: if logado() && request.resource.data.userId == request.auth.uid;
+      // O autor edita o próprio post, mas não pode trocar o dono (userId).
       allow update: if logado() && (
-        resource.data.userId == request.auth.uid || registraAvistamento());
+        (resource.data.userId == request.auth.uid
+          && request.resource.data.userId == resource.data.userId)
+        || registraAvistamento());
       allow delete: if logado() && resource.data.userId == request.auth.uid;
 
       // "Eu vi": só sightingsCount e helpersCount, exatamente +1, e no mesmo
