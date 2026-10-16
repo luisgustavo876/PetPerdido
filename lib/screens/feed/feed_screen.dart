@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_colors.dart';
+import '../../core/geo.dart';
+import '../../models/post_filter.dart';
 import '../../models/post_model.dart';
+import '../../services/location_service.dart';
 import '../../services/post_service.dart';
+import '../../services/user_service.dart';
+import '../../widgets/filtros_sheet.dart';
 import '../../widgets/pet_post_card.dart';
 import 'detail_screen.dart';
 
+/// Feed: lista de posts com busca, filtros, favoritos e ordenação.
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
 
@@ -14,280 +19,323 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
-  String _searchQuery = '';
-  String _activeFilter = 'todos';
+  /// Stream único da tela, criado no initState (nunca dentro do build).
+  late Stream<List<PostModel>> _postsStream;
 
-  List<PostModel> _getFilteredPosts(List<PostModel> posts) {
-    var list = posts;
+  /// O campo de busca fica FORA do StreamBuilder e tem controller próprio,
+  /// então não perde o texto quando a lista atualiza.
+  final _buscaController = TextEditingController();
+  String _busca = '';
 
-    if (_activeFilter == 'lost') {
-      list = list.where((p) => p.type == PostType.lost).toList();
-    } else if (_activeFilter == 'sighted') {
-      list = list.where((p) => p.type == PostType.sighted).toList();
-    } else if (_activeFilter == 'found') {
-      list = list.where((p) => p.type == PostType.found).toList();
+  PostFilter _filtro = const PostFilter();
+  Set<String> _favoritos = {};
+  ({double lat, double lng})? _minhaPosicao;
+
+  static const _atalhosTipo = [
+    (null, 'Todos'),
+    (PostType.lost, 'Perdidos'),
+    (PostType.sighted, 'Avistados'),
+    (PostType.found, 'Achados'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _postsStream = PostService.postsStream();
+    _carregarFavoritos();
+    _posicaoSemPedir();
+  }
+
+  @override
+  void dispose() {
+    _buscaController.dispose();
+    super.dispose();
+  }
+
+  void _tentarDeNovo() =>
+      setState(() => _postsStream = PostService.postsStream());
+
+  Future<void> _carregarFavoritos() async {
+    try {
+      final favs = await UserService.favoritos();
+      if (mounted) setState(() => _favoritos = favs);
+    } catch (_) {
+      // Sem favoritos (ex.: offline): o filtro só não encontra nada.
     }
+  }
 
-    if (_searchQuery.isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
-      list = list.where((p) {
-        return p.petName.toLowerCase().contains(query) ||
-            p.breed.toLowerCase().contains(query) ||
-            p.description.toLowerCase().contains(query) ||
-            p.traits.any((t) => t.toLowerCase().contains(query)) ||
-            p.lastSeenAddress.toLowerCase().contains(query);
-      }).toList();
+  /// Distâncias nos cards, se o usuário já tiver dado permissão de localização.
+  Future<void> _posicaoSemPedir() async {
+    final pos = await LocationService.posicaoSemPedir();
+    if (pos != null && mounted) setState(() => _minhaPosicao = pos);
+  }
+
+  Future<void> _abrirFiltros() async {
+    final novo = await FiltrosSheet.abrir(
+      context,
+      inicial: _filtro,
+      mostrarPorte: true,
+      mostrarCor: true,
+      mostrarFavoritos: true,
+      mostrarResolvidos: true,
+      mostrarOrdem: true,
+    );
+    if (novo == null || !mounted) return;
+    setState(() => _filtro = novo);
+    if (novo.soFavoritos) _carregarFavoritos();
+    if (novo.ordem == OrdemFeed.maisPerto && _minhaPosicao == null) {
+      await _pedirPosicao();
     }
+  }
 
-    return list;
+  /// "Mais perto de mim" precisa da localização: pede permissão agora.
+  Future<void> _pedirPosicao() async {
+    try {
+      final pos = await LocationService.posicaoAtual();
+      if (mounted) setState(() => _minhaPosicao = pos);
+    } on LocationException catch (e) {
+      if (!mounted) return;
+      setState(() => _filtro = _filtro.copyWith(ordem: OrdemFeed.recentes));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${e.message} Mostrando os mais recentes.')));
+    }
+  }
+
+  double? _distancia(PostModel p) {
+    final eu = _minhaPosicao;
+    if (eu == null) return null;
+    return Geo.distanciaKm(eu.lat, eu.lng, p.latitude, p.longitude);
+  }
+
+  List<PostModel> _aplicar(List<PostModel> posts) {
+    final agora = DateTime.now();
+    final lista = posts
+        .where((p) => _filtro.aceita(p, agora: agora, favoritos: _favoritos))
+        .where((p) => PostFilter.buscaCorresponde(p, _busca))
+        .toList();
+    if (_filtro.ordem == OrdemFeed.maisPerto && _minhaPosicao != null) {
+      lista.sort((a, b) => _distancia(a)!.compareTo(_distancia(b)!));
+    }
+    return lista;
+  }
+
+  Future<void> _abrirDetalhe(PostModel post) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => DetailScreen(post: post)),
+    );
+    _carregarFavoritos(); // pode ter favoritado lá dentro
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: StreamBuilder<List<PostModel>>(
-        stream: PostService.postsStream(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return const Center(child: Text('Erro ao carregar os posts.'));
-          }
-
-          final posts = snapshot.data ?? [];
-          final filteredPosts = _getFilteredPosts(posts);
-
-          return Column(
-            children: [
-              _buildSearchSection(),
-              Expanded(
-                child: filteredPosts.isEmpty
-                    ? _buildEmptyState()
-                    : ListView.builder(
-                        padding: const EdgeInsets.only(top: 8, bottom: 32),
-                        itemCount: filteredPosts.length,
-                        itemBuilder: (context, index) {
-                          return PetPostCard(
-                            post: filteredPosts[index],
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => DetailScreen(
-                                    post: filteredPosts[index],
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildSearchSection() {
-    final filters = [
-      {'id': 'todos', 'label': 'Todos'},
-      {'id': 'lost', 'label': 'Perdidos'},
-      {'id': 'sighted', 'label': 'Avistados'},
-      {'id': 'found', 'label': 'Achados'},
-    ];
-
-    return Container(
-      color: AppColors.surface,
-      child: Column(
+      body: Column(
         children: [
-          // Search bar no estilo Inter
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(26),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 16),
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.08),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.search,
-                            color: AppColors.primary,
-                            size: 16,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: AppColors.onSurface,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Buscar pets próximos...',
-                              hintStyle: GoogleFonts.inter(
-                                fontSize: 14,
-                                color: AppColors.textTertiary,
-                              ),
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero,
-                              fillColor: Colors.transparent,
-                              filled: false,
-                            ),
-                            onChanged: (val) =>
-                                setState(() => _searchQuery = val),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                // Botão de filtro avançado
-                GestureDetector(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Filtros avançados em breve')),
-                    );
-                  },
-                  child: Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(26),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.tune_rounded,
-                      color: AppColors.textSecondary,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Filtros por categoria
-          SizedBox(
-            height: 40,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              itemCount: filters.length,
-              itemBuilder: (context, index) {
-                final filter = filters[index];
-                final id = filter['id']!;
-                final isSelected = _activeFilter == id;
-
-                return GestureDetector(
-                  onTap: () => setState(() => _activeFilter = id),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primary : Colors.transparent,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected
-                            ? AppColors.primary
-                            : AppColors.divider,
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      filter['label']!,
-                      style: GoogleFonts.inter(
-                        color: isSelected
-                            ? Colors.white
-                            : AppColors.textSecondary,
-                        fontSize: 12,
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.w400,
-                      ),
-                    ),
+          _cabecalho(),
+          Expanded(
+            child: StreamBuilder<List<PostModel>>(
+              stream: _postsStream,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) return _estadoErro();
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final todos = snapshot.data!;
+                final posts = _aplicar(todos);
+                if (posts.isEmpty) return _estadoVazio(semPosts: todos.isEmpty);
+                return ListView.builder(
+                  padding: const EdgeInsets.only(top: 8, bottom: 32),
+                  itemCount: posts.length,
+                  itemBuilder: (context, i) => PetPostCard(
+                    post: posts[i],
+                    distanciaKm: _distancia(posts[i]),
+                    onTap: () => _abrirDetalhe(posts[i]),
                   ),
                 );
               },
             ),
           ),
-
-          // Linha divisória
-          Container(height: 1, color: AppColors.divider),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
+  Widget _cabecalho() {
+    final filtros = _filtro.quantidadeAtivos;
+    return Container(
+      color: AppColors.surface,
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.divider),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _buscaController,
+                    onChanged: (texto) => setState(() => _busca = texto),
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar por nome, raça, cor, bairro...',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      suffixIcon: _busca.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Limpar busca',
+                              icon: const Icon(Icons.close, size: 18),
+                              onPressed: () => setState(() {
+                                _buscaController.clear();
+                                _busca = '';
+                              }),
+                            ),
+                      contentPadding: EdgeInsets.zero,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.divider),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Badge(
+                  isLabelVisible: filtros > 0,
+                  label: Text('$filtros'),
+                  backgroundColor: AppColors.primary,
+                  child: IconButton.outlined(
+                    tooltip: 'Filtros e ordem',
+                    onPressed: _abrirFiltros,
+                    icon: const Icon(Icons.tune_rounded),
+                  ),
+                ),
+              ],
             ),
-            child: const Icon(Icons.search_off,
-                size: 36, color: AppColors.textTertiary),
           ),
-          const SizedBox(height: 20),
-          Text(
-            'Nenhum pet encontrado',
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w600,
-              fontSize: 16,
-              color: AppColors.onSurface,
+          SizedBox(
+            height: 48,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              children: [
+                for (final (tipo, rotulo) in _atalhosTipo) ...[
+                  _atalhoTipo(tipo, rotulo),
+                  const SizedBox(width: 8),
+                ],
+                if (_filtro.ordem == OrdemFeed.maisPerto)
+                  const Chip(
+                    avatar: Icon(Icons.near_me, size: 16),
+                    label: Text('Mais perto'),
+                  ),
+              ],
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Tente outros termos ou altere os filtros.',
-            style: GoogleFonts.inter(
-              color: AppColors.textSecondary,
-              fontSize: 13,
-            ),
-          ),
+          const Divider(height: 1),
         ],
+      ),
+    );
+  }
+
+  /// Atalhos rápidos de tipo (o mesmo filtro do painel).
+  Widget _atalhoTipo(PostType? tipo, String rotulo) {
+    final selecionado = tipo == null
+        ? _filtro.tipos.isEmpty
+        : _filtro.tipos.length == 1 && _filtro.tipos.contains(tipo);
+    return ChoiceChip(
+      label: Text(rotulo),
+      selected: selecionado,
+      onSelected: (_) => setState(() =>
+          _filtro = _filtro.copyWith(tipos: tipo == null ? {} : {tipo})),
+      labelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: selecionado ? Colors.white : AppColors.textSecondary,
+      ),
+    );
+  }
+
+  Widget _estadoVazio({required bool semPosts}) {
+    final temFiltro = _filtro.quantidadeAtivos > 0 || _busca.isNotEmpty;
+    return _Estado(
+      icone: semPosts ? Icons.pets : Icons.search_off,
+      titulo: semPosts ? 'Ainda não há posts' : 'Nenhum pet encontrado',
+      texto: semPosts
+          ? 'Quando alguém publicar, o post aparece aqui.'
+          : 'Tente outros termos ou altere os filtros.',
+      acao: temFiltro
+          ? OutlinedButton(
+              onPressed: () => setState(() {
+                _filtro = PostFilter(ordem: _filtro.ordem);
+                _buscaController.clear();
+                _busca = '';
+              }),
+              child: const Text('Limpar busca e filtros'),
+            )
+          : null,
+    );
+  }
+
+  Widget _estadoErro() {
+    return _Estado(
+      icone: Icons.cloud_off,
+      titulo: 'Não foi possível carregar os posts',
+      texto: 'Confira sua conexão com a internet.',
+      acao: ElevatedButton(
+        onPressed: _tentarDeNovo,
+        child: const Text('Tentar de novo'),
+      ),
+    );
+  }
+}
+
+/// Estado vazio ou de erro, centralizado.
+class _Estado extends StatelessWidget {
+  final IconData icone;
+  final String titulo;
+  final String texto;
+  final Widget? acao;
+
+  const _Estado({
+    required this.icone,
+    required this.titulo,
+    required this.texto,
+    this.acao,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Icon(icone, size: 36, color: AppColors.textTertiary),
+            ),
+            const SizedBox(height: 16),
+            Text(titulo,
+                textAlign: TextAlign.center,
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Text(texto,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 13, color: AppColors.textSecondary)),
+            if (acao != null) ...[
+              const SizedBox(height: 16),
+              SizedBox(width: 240, child: acao),
+            ],
+          ],
+        ),
       ),
     );
   }

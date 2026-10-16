@@ -27,6 +27,10 @@ class AppConstants {
   /// Evita expor a localização exata de quem publica (LGPD).
   static const int coordDecimals = 3;
 
+  // Aviso de posts semelhantes (Perdi x Achei/Avistei)
+  static const int similarWindowDays = 7;
+  static const double similarMaxKm = 3;
+
   // Validações (6 é o mínimo aceito pelo Firebase Auth)
   static const int minPasswordLength = 6;
   static const int cpfLength = 11;

@@ -1,3 +1,4 @@
+import '../core/formatters.dart';
 import 'post_model.dart';
 
 /// Período do filtro, contado a partir de quando o fato aconteceu (eventAt).
@@ -92,5 +93,26 @@ class PostFilter {
     final janela = periodo.janela;
     if (janela != null && agora.difference(post.eventAt) > janela) return false;
     return true;
+  }
+
+  /// Busca por texto em nome, raça, descrição, bairro, cor, tags, espécie e
+  /// características — sem diferenciar maiúsculas nem acentos.
+  /// Todas as palavras digitadas precisam aparecer. Função pura.
+  static bool buscaCorresponde(PostModel post, String busca) {
+    final palavras = Formatters.normalizar(busca)
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty);
+    if (palavras.isEmpty) return true;
+    final texto = Formatters.normalizar([
+      post.petName,
+      post.breed,
+      post.description,
+      post.lastSeenAddress,
+      post.species,
+      ...post.colors,
+      ...post.tags,
+      ...post.traits,
+    ].join(' '));
+    return palavras.every(texto.contains);
   }
 }
