@@ -72,6 +72,38 @@ void main() {
     });
   });
 
+  group('cores e data do ocorrido (eventAt)', () {
+    final comCores = post.copyWith(
+      colors: ['Preto', 'Branco'],
+      eventAt: DateTime(2026, 10, 5, 18, 0),
+    );
+
+    test('vão para o Firestore (eventAt como Timestamp)', () {
+      final map = comCores.toMap();
+      expect(map['colors'], ['Preto', 'Branco']);
+      expect(map['eventAt'], isA<Timestamp>());
+    });
+
+    test('voltam iguais pelo fromMap', () {
+      final copia = PostModel.fromMap(comCores.toMap());
+      expect(copia.colors, ['Preto', 'Branco']);
+      expect(copia.eventAt, DateTime(2026, 10, 5, 18, 0));
+    });
+
+    test('post antigo sem esses campos: sem cores e eventAt = createdAt', () {
+      final map = post.toMap()
+        ..remove('colors')
+        ..remove('eventAt');
+      final antigo = PostModel.fromMap(map);
+      expect(antigo.colors, isEmpty);
+      expect(antigo.eventAt, post.createdAt);
+    });
+
+    test('sem eventAt no construtor, vale o createdAt', () {
+      expect(post.eventAt, post.createdAt);
+    });
+  });
+
   group('PostType', () {
     test('converte o valor salvo no Firestore', () {
       expect(PostType.fromValue('perdi'), PostType.lost);

@@ -45,6 +45,10 @@ class PostModel {
   final String geohash;
   final String? photoUrl;
   final DateTime createdAt;
+
+  /// Quando o pet sumiu / foi achado / foi visto. Posts antigos não têm:
+  /// nesse caso vale o [createdAt].
+  final DateTime eventAt;
   final bool isResolved;
 
   // Novos campos do protótipo
@@ -52,6 +56,9 @@ class PostModel {
   final String species;
   final String size;
   final String sex;
+
+  /// Cores do pet (até 2). Posts antigos não têm: lista vazia.
+  final List<String> colors;
   final int points;
   final int helpersCount;
   final int sightingsCount;
@@ -72,17 +79,20 @@ class PostModel {
     String? geohash,
     this.photoUrl,
     required this.createdAt,
+    DateTime? eventAt,
     this.isResolved = false,
     required this.breed,
     required this.species,
     required this.size,
     required this.sex,
+    this.colors = const [],
     required this.points,
     required this.helpersCount,
     required this.sightingsCount,
     this.ownerAvatar,
     required this.traits,
-  }) : geohash = geohash ?? calcularGeohash(latitude, longitude);
+  })  : geohash = geohash ?? calcularGeohash(latitude, longitude),
+        eventAt = eventAt ?? createdAt;
 
   /// Geohash de uma coordenada. Atenção: o GeoHasher recebe longitude primeiro.
   static String calcularGeohash(double latitude, double longitude) =>
@@ -102,11 +112,13 @@ class PostModel {
     String? geohash,
     String? photoUrl,
     DateTime? createdAt,
+    DateTime? eventAt,
     bool? isResolved,
     String? breed,
     String? species,
     String? size,
     String? sex,
+    List<String>? colors,
     int? points,
     int? helpersCount,
     int? sightingsCount,
@@ -129,11 +141,13 @@ class PostModel {
       geohash: geohash ?? (mudouPosicao ? null : this.geohash),
       photoUrl: photoUrl ?? this.photoUrl,
       createdAt: createdAt ?? this.createdAt,
+      eventAt: eventAt ?? this.eventAt,
       isResolved: isResolved ?? this.isResolved,
       breed: breed ?? this.breed,
       species: species ?? this.species,
       size: size ?? this.size,
       sex: sex ?? this.sex,
+      colors: colors ?? this.colors,
       points: points ?? this.points,
       helpersCount: helpersCount ?? this.helpersCount,
       sightingsCount: sightingsCount ?? this.sightingsCount,
@@ -157,11 +171,13 @@ class PostModel {
       'geohash': geohash,
       'photoUrl': photoUrl,
       'createdAt': Timestamp.fromDate(createdAt),
+      'eventAt': Timestamp.fromDate(eventAt),
       'isResolved': isResolved,
       'breed': breed,
       'species': species,
       'size': size,
       'sex': sex,
+      'colors': colors,
       'points': points,
       'helpersCount': helpersCount,
       'sightingsCount': sightingsCount,
@@ -179,13 +195,8 @@ class PostModel {
       throw FormatException('Tipo de post desconhecido: ${map['type']}');
     }
 
-    final rawCreatedAt = map['createdAt'];
-    final DateTime createdAt;
-    if (rawCreatedAt is Timestamp) {
-      createdAt = rawCreatedAt.toDate();
-    } else if (rawCreatedAt is String) {
-      createdAt = DateTime.parse(rawCreatedAt); // posts antigos
-    } else {
+    final createdAt = _lerData(map['createdAt']);
+    if (createdAt == null) {
       throw const FormatException('createdAt ausente ou inválido');
     }
 
@@ -203,16 +214,25 @@ class PostModel {
       geohash: map['geohash'] as String?, // posts antigos não têm
       photoUrl: map['photoUrl'] as String?,
       createdAt: createdAt,
+      eventAt: _lerData(map['eventAt']), // posts antigos: usa createdAt
       isResolved: map['isResolved'] as bool? ?? false,
       breed: map['breed'] as String? ?? 'Desconhecida',
       species: map['species'] as String? ?? 'Cão',
       size: map['size'] as String? ?? 'Médio',
       sex: map['sex'] as String? ?? 'Macho',
+      colors: List<String>.from(map['colors'] as List? ?? []),
       points: map['points'] as int? ?? 0,
       helpersCount: map['helpersCount'] as int? ?? 0,
       sightingsCount: map['sightingsCount'] as int? ?? 0,
       ownerAvatar: map['ownerAvatar'] as String?,
       traits: List<String>.from(map['traits'] as List? ?? []),
     );
+  }
+
+  /// Data salva como Timestamp (atual) ou texto ISO (posts antigos).
+  static DateTime? _lerData(Object? valor) {
+    if (valor is Timestamp) return valor.toDate();
+    if (valor is String) return DateTime.tryParse(valor);
+    return null;
   }
 }
