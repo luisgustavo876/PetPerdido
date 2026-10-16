@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_colors.dart';
-import '../../core/dados_globais.dart';
+import '../../core/app_constants.dart';
+import '../../core/recompensas.dart';
+import '../../services/pontos_service.dart';
+import 'historico_pontos_screen.dart';
+import 'meus_resgates_screen.dart';
 
-/// Tela de Pontos e Recompensas.
-/// Versão simplificada para o protótipo do TCC.
+/// Pontos e recompensas: saldo real (users/{uid}.points), nível, como ganhar
+/// e catálogo de recompensas de exemplo com resgate.
 class PointsScreen extends StatefulWidget {
   const PointsScreen({super.key});
 
@@ -13,190 +16,183 @@ class PointsScreen extends StatefulWidget {
 }
 
 class _PointsScreenState extends State<PointsScreen> {
+  /// Stream único da tela, criado no initState.
+  late Stream<int> _saldoStream;
+  String? _resgatando; // id da recompensa sendo resgatada
 
-  // Lista de recompensas disponíveis
-  static const List<Map<String, dynamic>> _rewards = [
-    {
-      'id': 'banho_gratis',
-      'title': 'Banho Completo',
-      'partner': 'PetShop Amigão',
-      'points': 100,
-      'icon': Icons.shower_outlined,
-      'color': Color(0xFF2563EB),
-      'surface': Color(0xFFEFF6FF),
-    },
-    {
-      'id': 'saco_racao',
-      'title': 'Saco de Ração 15kg',
-      'partner': 'AgroPet Silva',
-      'points': 150,
-      'icon': Icons.backpack_outlined,
-      'color': Color(0xFFD97706),
-      'surface': Color(0xFFFFFBEB),
-    },
-    {
-      'id': 'consulta_vet',
-      'title': 'Consulta Veterinária',
-      'partner': 'Clínica ProBicho',
-      'points': 250,
-      'icon': Icons.medical_services_outlined,
-      'color': Color(0xFF16A34A),
-      'surface': Color(0xFFF0FDF4),
-    },
-    {
-      'id': 'castracao',
-      'title': 'Castração Solidária',
-      'partner': 'Hospital Vet Municipal',
-      'points': 300,
-      'icon': Icons.pets_outlined,
-      'color': Color(0xFF7C3AED),
-      'surface': Color(0xFFF5F3FF),
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _saldoStream = PontosService.saldoStream();
+  }
+
+  Future<void> _resgatar(Recompensa r) async {
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Resgatar "${r.titulo}"?'),
+        content: Text('Serão debitados ${r.custo} pontos do seu saldo.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            child: const Text('Resgatar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmou != true || !mounted) return;
+
+    setState(() => _resgatando = r.id);
+    try {
+      final resgate = await PontosService.resgatar(r);
+      if (mounted) _mostrarVoucher(resgate);
+    } on ResgateException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.mensagem)));
+      }
+    } finally {
+      if (mounted) setState(() => _resgatando = null);
+    }
+  }
+
+  void _mostrarVoucher(Resgate resgate) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.check_circle, color: AppColors.tagFound, size: 48),
+        title: const Text('Resgate realizado!'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(resgate.titulo, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            _CodigoVoucher(resgate.codigo),
+            const SizedBox(height: 16),
+            const Text(
+              'Demonstração: o código fica salvo em "Meus resgates". '
+              'As parcerias são exemplos.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Ótimo')),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final points = DadosGlobais.pontosUsuario;
-    final redeemed = DadosGlobais.recompensasResgatadas;
-
-    return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Card principal de pontos
-              _buildPointsCard(points),
-              const SizedBox(height: 16),
-
-              // Barra de progresso de nível
-              _buildLevelCard(points),
-              const SizedBox(height: 28),
-
-              // Título seção recompensas
-              Text(
-                'Recompensas',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.onSurface,
-                  letterSpacing: -0.3,
+    return StreamBuilder<int>(
+      stream: _saldoStream,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Não foi possível carregar seus pontos.'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () =>
+                      setState(() => _saldoStream = PontosService.saldoStream()),
+                  child: const Text('Tentar de novo'),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Use seus pontos em parceiros locais de Itapetininga.',
-                style: GoogleFonts.inter(
-                    fontSize: 13, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 16),
-
-              // Grid de recompensas
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 0.85,
+              ],
+            ),
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final saldo = snapshot.data!;
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _cartaoSaldo(saldo),
+            const SizedBox(height: 16),
+            _cartaoNivel(saldo),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const HistoricoPontosScreen())),
+                    icon: const Icon(Icons.history, size: 18),
+                    label: const Text('Histórico'),
+                  ),
                 ),
-                itemCount: _rewards.length,
-                itemBuilder: (context, index) {
-                  final reward = _rewards[index];
-                  final isRedeemed = redeemed.contains(reward['id']);
-                  return _buildRewardCard(
-                    context,
-                    reward,
-                    isRedeemed,
-                  );
-                },
-              ),
-              const SizedBox(height: 32),
-            ],
-          ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const MeusResgatesScreen())),
+                    icon: const Icon(Icons.confirmation_number_outlined, size: 18),
+                    label: const Text('Meus resgates'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            _comoGanhar(),
+            const SizedBox(height: 24),
+            const Text('Recompensas',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            const Text(
+              'Parcerias de exemplo com o comércio pet local (expansão futura do projeto).',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            for (final r in catalogoRecompensas) _itemRecompensa(r, saldo),
+            const SizedBox(height: 16),
+          ],
         );
+      },
+    );
   }
 
-  Widget _buildPointsCard(int points) {
+  Widget _cartaoSaldo(int saldo) {
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppColors.primary,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Positioned(
-            right: -12,
-            bottom: -12,
-            child: Opacity(
-              opacity: 0.08,
-              child: Icon(Icons.pets, size: 100, color: Colors.white),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'SEUS PONTOS',
-                style: GoogleFonts.inter(
-                  color: Colors.white60,
+          const Text('SEUS PONTOS',
+              style: TextStyle(
+                  color: Colors.white70,
                   fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    '$points',
-                    style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8)),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text('$saldo',
+                  style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 52,
+                      fontSize: 48,
                       fontWeight: FontWeight.w800,
-                      letterSpacing: -2,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'pts',
-                    style: GoogleFonts.inter(
+                      letterSpacing: -2)),
+              const SizedBox(width: 8),
+              const Text('pts',
+                  style: TextStyle(
                       color: Colors.white70,
                       fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.shield_outlined,
-                        color: Colors.white, size: 13),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Cidadão Pet Ativo · Itapetininga',
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                      fontWeight: FontWeight.w600)),
             ],
           ),
         ],
@@ -204,259 +200,176 @@ class _PointsScreenState extends State<PointsScreen> {
     );
   }
 
-  Widget _buildLevelCard(int points) {
-    const int levelMax = 500;
-    final double percent = (points / levelMax).clamp(0.0, 1.0);
-    final int remaining = (levelMax - points).clamp(0, levelMax);
-
+  Widget _cartaoNivel(int saldo) {
+    final nivel = PontosService.nivel(saldo);
+    final proximo = nivel.proximo;
+    final progresso = proximo == null
+        ? 1.0
+        : ((saldo - nivel.minimo) / (proximo - nivel.minimo)).clamp(0.0, 1.0);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.divider, width: 0.5),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Nível 3 · Vizinho Ajudante',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.onSurface,
-                ),
-              ),
-              Text(
-                '$points / $levelMax',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+          Text(nivel.nome,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
           ClipRRect(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
-              value: percent,
+              value: progresso,
               minHeight: 8,
               backgroundColor: AppColors.background,
-              valueColor:
-                  const AlwaysStoppedAnimation<Color>(AppColors.primary),
+              valueColor: const AlwaysStoppedAnimation(AppColors.primary),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
-            'Faltam $remaining pts para o Nível 4.',
-            style: GoogleFonts.inter(
-                fontSize: 12, color: AppColors.textSecondary),
+            proximo == null
+                ? 'Você chegou ao nível máximo. Obrigado por ajudar!'
+                : 'Faltam ${proximo - saldo} pts para o próximo nível.',
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildRewardCard(
-    BuildContext context,
-    Map<String, dynamic> reward,
-    bool isRedeemed,
-  ) {
-    final cost = reward['points'] as int;
-    final canRedeem = DadosGlobais.pontosUsuario >= cost && !isRedeemed;
-    final color = reward['color'] as Color;
-    final surface = reward['surface'] as Color;
-
-    return Opacity(
-      opacity: isRedeemed ? 0.55 : 1.0,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: canRedeem
-                ? AppColors.primary.withValues(alpha: 0.3)
-                : AppColors.divider,
-            width: canRedeem ? 1.5 : 0.5,
+  Widget _comoGanhar() {
+    Widget linha(IconData icone, String texto, int pts) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Icon(icone, size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Expanded(child: Text(texto, style: const TextStyle(fontSize: 13))),
+              Text('+$pts',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, color: AppColors.tagFound)),
+            ],
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: surface,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(reward['icon'] as IconData, color: color, size: 20),
-            ),
-            const Spacer(),
-            Text(
-              reward['partner'] as String,
-              style: GoogleFonts.inter(
-                  fontSize: 10,
-                  color: AppColors.textTertiary,
-                  fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              reward['title'] as String,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppColors.onSurface,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.stars_rounded,
-                        color: Colors.amber, size: 13),
-                    const SizedBox(width: 3),
-                    Text(
-                      '$cost',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-                GestureDetector(
-                  onTap: canRedeem
-                      ? () {
-                          if (DadosGlobais.resgatarRecompensa(
-                                reward['id'], reward['points'])) {
-                              setState(() {}); // Atualiza a tela
-                              _showSuccessDialog(context, reward['title']);
-                            }
-                        }
-                      : null,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: isRedeemed
-                          ? AppColors.background
-                          : (canRedeem
-                              ? AppColors.primary
-                              : AppColors.background),
-                      borderRadius: BorderRadius.circular(7),
-                    ),
-                    child: Text(
-                      isRedeemed ? 'Usado' : 'Resgatar',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isRedeemed
-                            ? AppColors.textTertiary
-                            : (canRedeem
-                                ? Colors.white
-                                : AppColors.textTertiary),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+        );
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Como ganhar pontos',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          linha(Icons.home_outlined, 'Publicar que acolheu um pet ("Achei")',
+              AppConstants.pontosAchei),
+          linha(Icons.visibility_outlined, 'Publicar que viu um pet solto ("Avistei")',
+              AppConstants.pontosAvistei),
+          linha(Icons.where_to_vote_outlined,
+              'Registrar "Eu vi este pet" (uma vez por post)', AppConstants.pontosEuVi),
+        ],
       ),
     );
   }
 
-  void _showSuccessDialog(BuildContext context, String title) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Icon(Icons.check_rounded,
-                    color: Color(0xFF16A34A), size: 32),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Resgate realizado!',
-                style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Apresente o código no parceiro para utilizar o benefício.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.divider),
-                ),
-                child: const Column(
-                  children: [
-                    Text(
-                      'CÓDIGO DE RESGATE',
-                      style: TextStyle(
-                          fontSize: 10,
-                          color: AppColors.textTertiary,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'PET-HELP-5897',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 20,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Confirmar'),
-                ),
-              ),
-            ],
+  Widget _itemRecompensa(Recompensa r, int saldo) {
+    final pode = saldo >= r.custo;
+    final carregando = _resgatando == r.id;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+            color: pode ? AppColors.primaryLight : AppColors.divider),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: r.cor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(r.icone, color: r.cor),
           ),
-        ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(Recompensa.parceiroExemplo,
+                    style: TextStyle(fontSize: 10, color: AppColors.textTertiary)),
+                Text(r.titulo,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                Text(r.descricao,
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                const SizedBox(height: 4),
+                Text('${r.custo} pts',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 96,
+            child: ElevatedButton(
+              onPressed: pode && _resgatando == null ? () => _resgatar(r) : null,
+              style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 8)),
+              child: carregando
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text('Resgatar', style: TextStyle(fontSize: 13)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Código do voucher em destaque.
+class _CodigoVoucher extends StatelessWidget {
+  final String codigo;
+  const _CodigoVoucher(this.codigo);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        children: [
+          const Text('CÓDIGO DO VOUCHER',
+              style: TextStyle(
+                  fontSize: 10,
+                  color: AppColors.textTertiary,
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          SelectableText(codigo,
+              style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 20,
+                  letterSpacing: 1)),
+        ],
       ),
     );
   }

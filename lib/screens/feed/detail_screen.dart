@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/app_colors.dart';
+import '../../core/app_constants.dart';
 import '../../core/formatters.dart';
 import '../../core/pet_options.dart';
 import '../../core/post_type_style.dart';
 import '../../models/post_model.dart';
 import '../../models/sighting_model.dart';
 import '../../services/auth_service.dart';
+import '../../services/pontos_service.dart';
 import '../../services/post_service.dart';
 import '../../services/user_service.dart';
 import '../../widgets/pet_image.dart';
@@ -140,7 +142,9 @@ class _DetailScreenState extends State<DetailScreen> {
 
   Future<void> _euVi() async {
     final registrou = await EuViSheet.abrir(context, _post.id);
-    if (!registrou || !mounted) return;
+    if (!registrou) return;
+    await PontosService.ganharPorAvistamento(_post.id); // +15, uma vez por post
+    if (!mounted) return;
     setState(() => _post = _post.copyWith(
           sightingsCount: _post.sightingsCount + 1,
           helpersCount: _post.helpersCount + 1,
@@ -151,7 +155,8 @@ class _DetailScreenState extends State<DetailScreen> {
         icon: const Icon(Icons.check_circle, color: AppColors.tagFound, size: 48),
         title: const Text('Obrigado!'),
         content: const Text(
-          'Seu avistamento foi registrado e já aparece para quem publicou.',
+          'Seu avistamento foi registrado e já aparece para quem publicou.\n\n'
+          '+${AppConstants.pontosEuVi} pontos!',
           textAlign: TextAlign.center,
         ),
         actions: [

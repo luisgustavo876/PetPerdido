@@ -15,8 +15,8 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
 | 1 | 6 Detalhe | ✅ Feito |
 | 2 | IA (Gemini) | ✅ Feito (falta você ativar o AI Logic no console) |
 | 3 | Geofencing + Push | ✅ Código pronto · ⏸️ deploy da Function espera sua autorização |
-| 4 | 7 Pontos e recompensas | ⏳ Em andamento |
-| 5 | 8 Chat | Pendente |
+| 4 | 7 Pontos e recompensas | ✅ Feito |
+| 5 | 8 Chat | ⏳ Em andamento |
 | 6 | 9 Configurações, perfil e LGPD | Pendente |
 | 7 | Fechamento | Pendente |
 
@@ -50,6 +50,11 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
   Cloud Function `alertarProximos` em `functions/` (Node 22, southamerica-east1) com lógica pura
   testada (`npm test`, 9 testes). Regras de `users/{uid}/notifications` publicadas e validadas (13/13).
   **Falta:** deploy da Function (precisa da sua autorização) e o teste ponta a ponta.
+- **Módulo 7** — pontos reais em `users/{uid}.points` (stream): Achei +30, Avistei +10, "Eu vi" +15
+  (uma vez por post), sempre em transação com registro em `pointsLog`; nível com barra de progresso;
+  "Como ganhar pontos"; histórico; catálogo de recompensas de exemplo ("Exemplo de parceria", sem
+  marcas); resgate em transação que confere o saldo e gera o código do voucher; "Meus resgates".
+  `DadosGlobais` não guarda mais pontos. Regras validadas por REST (18/18).
 
 ## Decisões de implementação
 
@@ -106,6 +111,14 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
   VAPID e service worker); no iOS o push exige chave APNs (conta Apple Developer).
 - Ao sair da conta, o `fcmToken` é apagado do `users/{uid}` (o aparelho para de receber os alertas
   daquela conta).
+- **Pontos — "uma vez só":** cada ganho usa um id fixo no `pointsLog` (`post_<id>`, `euvi_<id>`); a
+  transação não soma de novo se o lançamento já existe, e as regras não deixam recriar nem editar
+  lançamentos. Publicar "Perdi" não dá pontos (só contribuições para os outros).
+- **Pontos — limitação:** a pontuação é gravada pelo próprio app (o dono pode escrever em
+  `users/{uid}`). Num produto real ela iria para uma Cloud Function. Registrado para o TG.
+- **Recompensas:** catálogo fixo em `lib/core/recompensas.dart` (5 itens genéricos). Código do voucher
+  `PET-XXXX-XXXX` sem caracteres que confundem (0/O, 1/I). É demonstração, sem validação no parceiro.
+- **Níveis:** Vizinho atento (0), Ajudante da rua (50), Protetor do bairro (150), Herói dos pets (300).
 
 ## Passos manuais pendentes (dependem de você)
 

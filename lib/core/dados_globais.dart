@@ -1,11 +1,6 @@
+/// Chats em memória (provisório). Os pontos e os resgates já vêm do
+/// Firestore (PontosService). Este arquivo some quando o chat real existir.
 class DadosGlobais {
-  // Variável estática simples para armazenar os pontos do usuário na memória
-  static int pontosUsuario = 320;
-
-  // Lista simples para armazenar recompensas resgatadas
-  static List<String> recompensasResgatadas = [];
-
-  // Mapa simples para simular o armazenamento local de chats
   // Formato: { "postId": [ {"senderName": "...", "message": "..."} ] }
   static final Map<String, List<Map<String, dynamic>>> chats = {};
 
@@ -21,15 +16,5 @@ class DadosGlobais {
       'createdAt': DateTime.now(),
       'photoUrl': null,
     });
-  }
-
-  /// Tenta resgatar uma recompensa (deduz os pontos)
-  static bool resgatarRecompensa(String rewardId, int custo) {
-    if (pontosUsuario >= custo && !recompensasResgatadas.contains(rewardId)) {
-      pontosUsuario -= custo;
-      recompensasResgatadas.add(rewardId);
-      return true;
-    }
-    return false;
   }
 }

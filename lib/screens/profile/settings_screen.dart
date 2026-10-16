@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
-import '../../core/dados_globais.dart';
 import '../../services/alerta_service.dart';
 import '../../services/auth_service.dart';
 
@@ -95,7 +94,7 @@ class SettingsScreen extends StatelessWidget {
                                 color: Colors.amber, size: 14),
                             const SizedBox(width: 4),
                             Text(
-                              '${DadosGlobais.pontosUsuario} pts',
+                              'Pontos: veja na aba Pontos',
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,

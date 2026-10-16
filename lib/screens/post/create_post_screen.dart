@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../services/auth_service.dart';
+import '../../services/pontos_service.dart';
 import '../../services/post_service.dart';
 import '../../services/storage_service.dart';
 import 'post_draft.dart';
@@ -149,8 +150,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ownerAvatar: user.photoURL,
       );
       await PostService.createPost(post).timeout(_timeout);
+      // Achei +30, Avistei +10 (uma vez por post, mesmo tentando de novo).
+      await PontosService.ganharPorPost(post);
 
-      if (mounted) _showSuccessDialog(context);
+      if (mounted) {
+        _showSuccessDialog(context, PontosService.pontosPorPost(post.type));
+      }
     } catch (e) {
       debugPrint('Erro ao publicar post ($etapa): $e');
       if (mounted) _mostrarMensagem(_mensagemDeErro(e, etapa));
@@ -159,7 +164,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
-  void _showSuccessDialog(BuildContext context) {
+  void _showSuccessDialog(BuildContext context, int pontos) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -190,10 +195,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Sua postagem foi enviada com sucesso para a rede de moradores e já está visível no mapa!',
+                  'Sua postagem já está no mapa e no feed. Quem estiver perto e '
+                  'com os alertas ligados será avisado.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13, color: Colors.black54),
                 ),
+                if (pontos > 0) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    '+$pontos pontos!',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.tagFound,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,

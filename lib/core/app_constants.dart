@@ -51,4 +51,9 @@ class AppConstants {
 
   // Pontos com que todo usuário novo começa
   static const int initialPoints = 0;
+
+  // Pontuação por contribuição
+  static const int pontosAchei = 30; // publicar "Achei"
+  static const int pontosAvistei = 10; // publicar "Avistei"
+  static const int pontosEuVi = 15; // "Eu vi este pet" (uma vez por post)
 }

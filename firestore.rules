@@ -54,6 +54,15 @@ service cloud.firestore {
         allow update: if logado() && request.auth.uid == userId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
       }
+
+      // Pontos e resgates: o dono lê, cria e apaga (excluir conta); ninguém edita.
+      // Limitação: os pontos são gravados pelo app (num produto real, por uma Function).
+      match /pointsLog/{lancamentoId} {
+        allow read, create, delete: if logado() && request.auth.uid == userId;
+      }
+      match /redemptions/{resgateId} {
+        allow read, create, delete: if logado() && request.auth.uid == userId;
+      }
     }
   }
 }
