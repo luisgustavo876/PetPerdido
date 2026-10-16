@@ -1,14 +1,20 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../core/app_colors.dart';
 import '../../core/app_constants.dart';
 import '../../core/app_routes.dart';
 import '../../core/post_type_style.dart';
+import '../../models/post_filter.dart';
 import '../../models/post_model.dart';
+import '../../services/location_service.dart';
 import '../../services/post_service.dart';
+import '../../widgets/filtros_sheet.dart';
 import '../../widgets/pet_image.dart';
 import '../feed/detail_screen.dart';
 
+/// Mapa com os posts: marcadores coloridos por tipo, filtros reais,
+/// camada satélite e "Minha localização".
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
 
@@ -17,12 +23,27 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  GoogleMapController? _mapController;
-
-  static const CameraPosition _initialPosition = CameraPosition(
+  static const _centroPadrao = CameraPosition(
     target: LatLng(AppConstants.defaultLat, AppConstants.defaultLng),
     zoom: 13.8,
   );
+
+  GoogleMapController? _mapController;
+
+  /// Stream único da tela, criado no initState (nunca dentro do build).
+  late Stream<List<PostModel>> _postsStream;
+
+  PostFilter _filtro = const PostFilter();
+  MapType _camada = MapType.normal;
+  LatLng? _minhaPosicao;
+  bool _localizando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _postsStream = PostService.postsStream();
+    _centralizarSemPedir();
+  }
 
   @override
   void dispose() {
@@ -30,34 +51,82 @@ class _MapScreenState extends State<MapScreen> {
     super.dispose();
   }
 
-  Set<Marker> _buildMarkers(List<PostModel> posts) {
-    return posts.map((post) {
-      return Marker(
-        markerId: MarkerId(post.id),
-        position: LatLng(post.latitude, post.longitude),
-        icon: BitmapDescriptor.defaultMarkerWithHue(_hueForType(post.type)),
-        onTap: () => _showPostBottomSheet(post),
-      );
-    }).toSet();
+  void _tentarDeNovo() =>
+      setState(() => _postsStream = PostService.postsStream());
+
+  /// Câmera inicial: posição do usuário, se ele já deu permissão antes.
+  Future<void> _centralizarSemPedir() async {
+    final pos = await LocationService.posicaoSemPedir();
+    if (pos == null || !mounted) return;
+    setState(() => _minhaPosicao = LatLng(pos.lat, pos.lng));
+    _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_minhaPosicao!, 14));
   }
 
-  double _hueForType(PostType type) {
-    switch (type) {
-      case PostType.lost:
-        return BitmapDescriptor.hueRed;
-      case PostType.found:
-        return BitmapDescriptor.hueGreen;
-      case PostType.sighted:
-        return BitmapDescriptor.hueOrange;
+  /// Botão "Minha localização": pede permissão se precisar e centraliza.
+  Future<void> _irParaMinhaLocalizacao() async {
+    setState(() => _localizando = true);
+    try {
+      final pos = await LocationService.posicaoAtual();
+      if (!mounted) return;
+      setState(() => _minhaPosicao = LatLng(pos.lat, pos.lng));
+      _mapController
+          ?.animateCamera(CameraUpdate.newLatLngZoom(_minhaPosicao!, 15));
+    } on LocationException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _localizando = false);
     }
   }
 
-  void _showPostBottomSheet(PostModel post) {
+  Future<void> _abrirFiltros() async {
+    final novo = await FiltrosSheet.abrir(
+      context,
+      inicial: _filtro,
+      mostrarPeriodo: true,
+      mostrarResolvidos: true,
+    );
+    if (novo != null && mounted) setState(() => _filtro = novo);
+  }
+
+  void _alternarCamada() => setState(() => _camada =
+      _camada == MapType.normal ? MapType.hybrid : MapType.normal);
+
+  Set<Marker> _marcadores(List<PostModel> posts) {
+    return {
+      for (final post in posts)
+        Marker(
+          markerId: MarkerId(post.id),
+          position: LatLng(post.latitude, post.longitude),
+          icon: BitmapDescriptor.defaultMarkerWithHue(_matiz(post.type)),
+          alpha: post.isResolved ? 0.5 : 1,
+          onTap: () => _abrirResumo(post),
+        ),
+      // Na Web o mapa não desenha o ponto azul nativo: usa um marcador azul.
+      if (kIsWeb && _minhaPosicao != null)
+        Marker(
+          markerId: const MarkerId('minha-posicao'),
+          position: _minhaPosicao!,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          infoWindow: const InfoWindow(title: 'Você está aqui'),
+        ),
+    };
+  }
+
+  double _matiz(PostType tipo) => switch (tipo) {
+        PostType.lost => BitmapDescriptor.hueRed,
+        PostType.found => BitmapDescriptor.hueGreen,
+        PostType.sighted => BitmapDescriptor.hueOrange,
+      };
+
+  void _abrirResumo(PostModel post) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _PostBottomSheet(post: post),
+      builder: (_) => _ResumoPost(post: post),
     );
   }
 
@@ -65,57 +134,43 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: StreamBuilder<List<PostModel>>(
-        stream: PostService.postsStream(),
+        stream: _postsStream,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final posts = snapshot.data ?? [];
-          final markers = _buildMarkers(posts);
-          final lostCount = posts.where((p) => p.type == PostType.lost).length;
+          final todos = snapshot.data ?? const <PostModel>[];
+          final agora = DateTime.now();
+          final visiveis =
+              todos.where((p) => _filtro.aceita(p, agora: agora)).toList();
+          final perdidos = visiveis
+              .where((p) => p.type == PostType.lost && !p.isResolved)
+              .length;
+          final carregando = !snapshot.hasData && !snapshot.hasError;
 
           return Stack(
             children: [
-              // GoogleMap real e funcional
               GoogleMap(
-                initialCameraPosition: _initialPosition,
-                markers: markers,
+                initialCameraPosition: _minhaPosicao == null
+                    ? _centroPadrao
+                    : CameraPosition(target: _minhaPosicao!, zoom: 14),
+                mapType: _camada,
+                markers: _marcadores(visiveis),
+                myLocationEnabled: !kIsWeb && _minhaPosicao != null,
                 myLocationButtonEnabled: false,
                 zoomControlsEnabled: false,
                 mapToolbarEnabled: false,
-                onMapCreated: (controller) {
-                  _mapController = controller;
-                },
+                onMapCreated: (c) => _mapController = c,
               ),
-
-              // Banner superior flutuante com gradiente
               Positioned(
-                top: 14,
+                top: 16,
                 left: 16,
                 right: 16,
-                child: _buildGradientAlertBanner(lostCount),
+                child: snapshot.hasError
+                    ? _avisoErro()
+                    : _bannerAlerta(perdidos, carregando,
+                        vazio: !carregando && visiveis.isEmpty),
               ),
-
-              // Controles laterais do mapa
-              Positioned(
-                right: 16,
-                top: 96,
-                child: _buildMapControls(),
-              ),
-
-              // Legenda suspensa
-              Positioned(
-                left: 16,
-                bottom: 84,
-                child: _buildLegend(),
-              ),
-
-              // FAB estendido para criar postagem
-              Positioned(
-                right: 16,
-                bottom: 20,
-                child: _buildCreatePostFab(context),
-              ),
+              Positioned(right: 16, top: 104, child: _controles()),
+              Positioned(left: 16, bottom: 88, child: _legenda()),
+              Positioned(right: 16, bottom: 24, child: _botaoCriar(context)),
             ],
           );
         },
@@ -123,7 +178,13 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _buildGradientAlertBanner(int count) {
+  Widget _bannerAlerta(int perdidos, bool carregando, {required bool vazio}) {
+    final texto = carregando
+        ? 'Carregando posts...'
+        : vazio
+            ? 'Nenhum post com esses filtros.'
+            : 'Há $perdidos pet${perdidos != 1 ? 's' : ''} '
+                'perdido${perdidos != 1 ? 's' : ''} na região!';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -138,70 +199,106 @@ class _MapScreenState extends State<MapScreen> {
             color: AppColors.primary.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Row(
         children: [
-          const Icon(Icons.notifications_active, color: Colors.white, size: 20),
-          const SizedBox(width: 10),
+          carregando
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : const Icon(Icons.notifications_active,
+                  color: Colors.white, size: 20),
+          const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'ALERTA DE SEGURANÇA',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 9,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Há $count pet${count != 1 ? 's' : ''} perdido${count != 1 ? 's' : ''} na sua região de busca!',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+            child: Text(
+              texto,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
             ),
           ),
-          const Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 12),
+          if (_filtro.quantidadeAtivos > 0)
+            GestureDetector(
+              onTap: () => setState(() => _filtro = const PostFilter()),
+              child: const Text(
+                'Limpar filtros',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  decoration: TextDecoration.underline,
+                  decorationColor: Colors.white,
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildMapControls() {
+  Widget _avisoErro() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primaryLight),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_off, color: AppColors.primary, size: 20),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Não foi possível carregar os posts.',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+          TextButton(onPressed: _tentarDeNovo, child: const Text('Tentar de novo')),
+        ],
+      ),
+    );
+  }
+
+  Widget _controles() {
+    final filtros = _filtro.quantidadeAtivos;
     return Column(
       children: [
-        _controlButton(Icons.my_location, 'Localizar', () {
-          _mapController?.animateCamera(
-            CameraUpdate.newCameraPosition(_initialPosition),
-          );
-        }),
-        const SizedBox(height: 10),
-        _controlButton(Icons.filter_list, 'Filtros', () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Aplicar filtros avançados de busca...')),
-          );
-        }),
-        const SizedBox(height: 10),
-        _controlButton(Icons.layers, 'Camadas', () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Alternar satélite / mapa padrão...')),
-          );
-        }),
+        _botaoRedondo(
+          icone: _localizando ? null : Icons.my_location,
+          dica: 'Minha localização',
+          onTap: _localizando ? null : _irParaMinhaLocalizacao,
+        ),
+        const SizedBox(height: 8),
+        Badge(
+          isLabelVisible: filtros > 0,
+          label: Text('$filtros'),
+          backgroundColor: AppColors.primary,
+          child: _botaoRedondo(
+            icone: Icons.filter_list,
+            dica: 'Filtros',
+            onTap: _abrirFiltros,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _botaoRedondo(
+          icone: _camada == MapType.normal ? Icons.satellite_alt : Icons.map,
+          dica: _camada == MapType.normal ? 'Ver satélite' : 'Ver mapa',
+          onTap: _alternarCamada,
+        ),
       ],
     );
   }
 
-  Widget _controlButton(IconData icon, String tooltip, VoidCallback onTap) {
+  /// Botão redondo branco. Com [icone] nulo mostra um carregamento.
+  Widget _botaoRedondo(
+      {IconData? icone, required String dica, VoidCallback? onTap}) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -211,283 +308,212 @@ class _MapScreenState extends State<MapScreen> {
             color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 3),
-          )
+          ),
         ],
       ),
       child: IconButton(
-        icon: Icon(icon, color: AppColors.onSurface, size: 20),
+        tooltip: dica,
         onPressed: onTap,
-        tooltip: tooltip,
+        icon: icone == null
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Icon(icone, color: AppColors.onSurface, size: 20),
       ),
     );
   }
 
-  Widget _buildLegend() {
+  Widget _legenda() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          )
-        ],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _legendItem(AppColors.tagLost, 'Perdido (Urgente)'),
-          const SizedBox(height: 6),
-          _legendItem(AppColors.tagSighted, 'Avistado na região'),
-          const SizedBox(height: 6),
-          _legendItem(AppColors.tagFound, 'Sob cuidados/Achado'),
+          for (final (tipo, rotulo) in const [
+            (PostType.lost, 'Perdido (urgente)'),
+            (PostType.sighted, 'Avistado na região'),
+            (PostType.found, 'Sob cuidados / achado'),
+          ])
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: tipo.color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(rotulo,
+                      style: const TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _legendItem(Color color, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 1.5),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10.5,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCreatePostFab(BuildContext context) {
+  Widget _botaoCriar(BuildContext context) {
     return FloatingActionButton.extended(
       heroTag: 'mapCreateFab',
       onPressed: () => Navigator.pushNamed(context, AppRoutes.createPost),
       backgroundColor: AppColors.primary,
       icon: const Icon(Icons.add, color: Colors.white),
-      elevation: 6,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       label: const Text(
-        'Criar Postagem',
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+        'Criar postagem',
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
       ),
     );
   }
 }
 
-class _PostBottomSheet extends StatelessWidget {
+/// Resumo do post ao tocar no marcador, com o botão "Ver detalhes".
+class _ResumoPost extends StatelessWidget {
   final PostModel post;
-  const _PostBottomSheet({required this.post});
+  const _ResumoPost({required this.post});
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = post.type.color;
+    final cor = post.type.color;
+    final nome = post.petName.isNotEmpty && post.petName != 'Sem nome'
+        ? post.petName
+        : 'Pet sem nome';
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.44,
-      minChildSize: 0.3,
-      maxChildSize: 0.6,
-      builder: (_, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-            boxShadow: [
-              BoxShadow(color: Colors.black26, blurRadius: 16),
-            ],
-          ),
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.all(20),
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.divider,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 16),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Imagem circular grande do pet
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      width: 90,
-                      height: 90,
-                      color: Colors.grey[100],
+            ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: SizedBox(
+                    width: 88,
+                    height: 88,
+                    child: ColoredBox(
+                      color: AppColors.background,
                       child: PetImage(url: post.photoUrl, iconSize: 32),
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: statusColor.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: statusColor.withValues(alpha: 0.2)),
-                              ),
-                              child: Text(
-                                post.type.label.toUpperCase(),
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          _etiqueta(post.type.label.toUpperCase(), cor),
+                          if (post.isResolved)
+                            _etiqueta('RESOLVIDO', AppColors.tagFound),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        nome,
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        [post.species, post.breed, ...post.colors].join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on,
+                              color: AppColors.primary, size: 14),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              post.lastSeenAddress,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 12, color: AppColors.textSecondary),
                             ),
-                            const Spacer(),
-                            if (post.points > 0)
-                              Row(
-                                children: [
-                                  const Icon(Icons.stars, color: Colors.amber, size: 14),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    '${post.points} pts',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                                  ),
-                                ],
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          post.petName.isNotEmpty && post.petName != 'Sem nome' ? post.petName : 'Sem Nome',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.onSurface,
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on, color: AppColors.primary, size: 12),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                post.lastSeenAddress,
-                                style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                post.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, height: 1.4, color: Colors.black87),
-              ),
-              const SizedBox(height: 16),
-              // Tags
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: post.traits.take(3).map((trait) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey[200]!),
-                    ),
-                    child: Text(
-                      trait,
-                      style: const TextStyle(fontSize: 10, color: Colors.black87),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 24),
-              // Botões de ação
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        side: const BorderSide(color: AppColors.primary),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        ],
                       ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => DetailScreen(post: post),
-                          ),
-                        );
-                      },
-                      child: const Text('Ver Detalhes', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => DetailScreen(post: post),
-                          ),
-                        );
-                      },
-                      child: const Text(
-                        'Ajudar Pet',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              post.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                final navigator = Navigator.of(context);
+                navigator.pop();
+                navigator.push(MaterialPageRoute(
+                    builder: (_) => DetailScreen(post: post)));
+              },
+              child: const Text('Ver detalhes'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _etiqueta(String texto, Color cor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: cor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: cor.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        texto,
+        style: TextStyle(color: cor, fontSize: 10, fontWeight: FontWeight.w800),
+      ),
     );
   }
 }

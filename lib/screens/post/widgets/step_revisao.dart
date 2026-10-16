@@ -5,7 +5,7 @@ import '../../../core/app_colors.dart';
 import '../../../models/post_model.dart';
 import '../../../widgets/pet_post_card.dart';
 import '../post_draft.dart';
-import '../post_options.dart';
+import '../../../core/pet_options.dart';
 import 'post_form_ui.dart';
 
 /// Etapa 5 — Revisão: prévia do card como vai aparecer no feed e um resumo

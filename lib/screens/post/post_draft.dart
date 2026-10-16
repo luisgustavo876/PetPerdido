@@ -4,7 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/app_constants.dart';
 import '../../models/post_model.dart';
 import '../../services/location_service.dart';
-import 'post_options.dart';
+import '../../core/pet_options.dart';
 
 /// Atalhos de "quando aconteceu" da etapa Onde e quando.
 enum QuandoAconteceu { agora, hojeDeManha, ontem, escolhido }
@@ -29,7 +29,7 @@ class PostDraft {
   final descriptionController = TextEditingController();
   String species = 'Cão';
   final Set<String> colors = {};
-  String breed = PostOptions.racaPadrao;
+  String breed = PetOptions.racaPadrao;
   String size = 'Médio';
   String sex = 'Macho';
   final Set<String> traits = {'Sem Coleira'};
@@ -91,8 +91,8 @@ class PostDraft {
           return 'Informe o nome do pet.';
         }
         if (colors.isEmpty) return 'Escolha pelo menos uma cor.';
-        if (colors.length > PostOptions.maxCores) {
-          return 'Escolha no máximo ${PostOptions.maxCores} cores.';
+        if (colors.length > PetOptions.maxCores) {
+          return 'Escolha no máximo ${PetOptions.maxCores} cores.';
         }
         if (descriptionController.text.trim().length < 10) {
           return 'Descreva o pet com pelo menos 10 caracteres.';
@@ -102,7 +102,7 @@ class PostDraft {
         final endereco = addressController.text.trim();
         if (endereco.isEmpty ||
             endereco.toLowerCase() ==
-                PostOptions.enderecoGenerico.toLowerCase()) {
+                PetOptions.enderecoGenerico.toLowerCase()) {
           return 'Informe o bairro para os outros acharem o pet';
         }
         if (eventAt(agora).isAfter(agora)) {
@@ -132,7 +132,7 @@ class PostDraft {
   }) {
     final pos =
         position ?? (lat: AppConstants.defaultLat, lng: AppConstants.defaultLng);
-    final raca = breed.trim().isEmpty ? PostOptions.racaPadrao : breed.trim();
+    final raca = breed.trim().isEmpty ? PetOptions.racaPadrao : breed.trim();
     final cores = colors.toList();
     return PostModel(
       id: id,

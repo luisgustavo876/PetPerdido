@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// Opções fixas do formulário de criar post.
-class PostOptions {
-  PostOptions._();
+/// Opções fixas sobre o pet (espécie, cor, raça, porte...), usadas no\n/// formulário de criar post e nos filtros.
+class PetOptions {
+  PetOptions._();
 
   static const especies = {'Cão': '🐶', 'Gato': '🐱'};
 

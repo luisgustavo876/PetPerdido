@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petperdido/models/post_model.dart';
 import 'package:petperdido/screens/post/post_draft.dart';
-import 'package:petperdido/screens/post/post_options.dart';
+import 'package:petperdido/core/pet_options.dart';
 
 void main() {
   final agora = DateTime(2026, 10, 15, 14, 30);
@@ -120,7 +120,7 @@ void main() {
     test('raça vazia vira "Sem raça definida"', () {
       final d = rascunhoValido()..breed = '  ';
       final p = d.toPostModel(id: 'x', userId: 'u', userName: 'n', agora: agora);
-      expect(p.breed, PostOptions.racaPadrao);
+      expect(p.breed, PetOptions.racaPadrao);
     });
 
     test('nome do pet só em Perdi', () {

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/app_colors.dart';
 import '../../../models/post_model.dart';
 import '../post_draft.dart';
-import '../post_options.dart';
+import '../../../core/pet_options.dart';
 import 'post_form_ui.dart';
 
 /// Etapa 3 — Sobre o pet: nome (só Perdi), espécie, cor, raça, porte, sexo,
@@ -38,7 +38,7 @@ class StepPet extends StatelessWidget {
         RotuloSecao(
           'Cor',
           complemento: Text(
-            'até ${PostOptions.maxCores} · ${draft.colors.length} escolhida(s)',
+            'até ${PetOptions.maxCores} · ${draft.colors.length} escolhida(s)',
             style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ),
@@ -66,7 +66,7 @@ class StepPet extends StatelessWidget {
     return Row(
       children: [
         for (final (i, MapEntry(key: especie, value: emoji))
-            in PostOptions.especies.entries.indexed) ...[
+            in PetOptions.especies.entries.indexed) ...[
           if (i > 0) const SizedBox(width: 16),
           Expanded(
             child: OpcaoCartao(
@@ -75,7 +75,7 @@ class StepPet extends StatelessWidget {
               onTap: () {
                 if (draft.species == especie) return;
                 draft.species = especie;
-                draft.breed = PostOptions.racaPadrao; // raças mudam por espécie
+                draft.breed = PetOptions.racaPadrao; // raças mudam por espécie
                 onChanged();
               },
               child: Column(
@@ -102,12 +102,12 @@ class StepPet extends StatelessWidget {
   }
 
   Widget _cores() {
-    final cheio = draft.colors.length >= PostOptions.maxCores;
+    final cheio = draft.colors.length >= PetOptions.maxCores;
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final MapEntry(key: nome, value: tons) in PostOptions.cores.entries)
+        for (final MapEntry(key: nome, value: tons) in PetOptions.cores.entries)
           FilterChip(
             avatar: _BolinhaCor(tons),
             label: Text(nome),
@@ -139,14 +139,14 @@ class StepPet extends StatelessWidget {
   }
 
   Widget _raca() {
-    final racas = PostOptions.racas[draft.species] ?? const [PostOptions.racaPadrao];
+    final racas = PetOptions.racas[draft.species] ?? const [PetOptions.racaPadrao];
     return Autocomplete<String>(
       // Recria o campo quando a espécie muda (a raça volta ao padrão).
       key: ValueKey(draft.species),
       initialValue: TextEditingValue(text: draft.breed),
       optionsBuilder: (valor) {
         final busca = valor.text.trim().toLowerCase();
-        if (busca.isEmpty || busca == PostOptions.racaPadrao.toLowerCase()) {
+        if (busca.isEmpty || busca == PetOptions.racaPadrao.toLowerCase()) {
           return racas;
         }
         return racas.where((r) => r.toLowerCase().contains(busca));
@@ -177,7 +177,7 @@ class StepPet extends StatelessWidget {
     return Row(
       children: [
         for (final (i, MapEntry(key: porte, value: peso))
-            in PostOptions.portes.entries.indexed) ...[
+            in PetOptions.portes.entries.indexed) ...[
           if (i > 0) const SizedBox(width: 8),
           Expanded(
             child: OpcaoCartao(
@@ -217,7 +217,7 @@ class StepPet extends StatelessWidget {
   Widget _sexos() {
     return Row(
       children: [
-        for (final (i, sexo) in PostOptions.sexos.indexed) ...[
+        for (final (i, sexo) in PetOptions.sexos.indexed) ...[
           if (i > 0) const SizedBox(width: 8),
           Expanded(
             child: OpcaoCartao(
@@ -262,7 +262,7 @@ class StepPet extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final item in PostOptions.caracteristicas)
+        for (final item in PetOptions.caracteristicas)
           FilterChip(
             label: Text(item),
             selected: draft.traits.contains(item),

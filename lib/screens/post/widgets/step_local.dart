@@ -7,7 +7,7 @@ import '../../../core/app_colors.dart';
 import '../../../core/app_constants.dart';
 import '../../../services/location_service.dart';
 import '../post_draft.dart';
-import '../post_options.dart';
+import '../../../core/pet_options.dart';
 import 'post_form_ui.dart';
 
 /// Etapa 4 — Onde e quando: marcador no mapa, bairro e data/hora.

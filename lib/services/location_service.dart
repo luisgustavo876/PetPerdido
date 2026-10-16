@@ -70,6 +70,27 @@ class LocationService {
     }
   }
 
+  /// Posição atual SEM pedir permissão: retorna null se o usuário ainda não
+  /// autorizou (ou se não for possível obter). Usada para a câmera inicial.
+  static Future<({double lat, double lng})?> posicaoSemPedir() async {
+    try {
+      final permissao = await Geolocator.checkPermission();
+      if (permissao != LocationPermission.always &&
+          permissao != LocationPermission.whileInUse) {
+        return null;
+      }
+      final p = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+      return (lat: p.latitude, lng: p.longitude);
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Endereço de uma coordenada (reverso)
   // ---------------------------------------------------------------------------
