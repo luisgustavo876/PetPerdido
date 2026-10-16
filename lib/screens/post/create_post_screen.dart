@@ -40,6 +40,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   /// atual". Enquanto não for null, têm prioridade sobre o endereço digitado.
   ({double lat, double lng})? _gpsPosition;
   bool _isLocating = false;
+
+  /// Dica embaixo do campo de endereço (ex.: quando o bairro não foi achado).
+  String? _dicaEndereco;
   bool _isLoading = false;
 
   /// ID do post, gerado uma vez quando a tela abre. Toda tentativa de
@@ -106,15 +109,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       final pos = await LocationService.posicaoAtual();
       final bairro = await LocationService.bairroDe(pos.lat, pos.lng);
       if (!mounted) return;
+      // Atribuir controller.text por código não dispara o onChanged do campo,
+      // então a posição do GPS continua valendo.
       setState(() {
         _gpsPosition = pos;
-        if (bairro != null) _addressController.text = bairro;
+        _addressController.text = bairro ?? 'Localização atual';
+        _dicaEndereco = bairro == null ? 'Edite para informar o bairro' : null;
       });
-      if (bairro == null) {
-        // Ex.: na Web o geocoding não funciona — a posição vale, falta o nome.
-        _mostrarMensagem(
-            'Localização obtida. Digite o bairro no campo de endereço.');
-      }
     } on LocationException catch (e) {
       if (mounted) _mostrarMensagem(e.message);
     } finally {
@@ -661,9 +662,30 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         const SizedBox(height: 8),
         TextField(
           controller: _addressController,
+          // Editar o texto à mão descarta a posição do GPS, para não publicar
+          // com uma coordenada que não corresponde mais ao endereço.
+          onChanged: (_) {
+            if (_gpsPosition != null || _dicaEndereco != null) {
+              setState(() {
+                _gpsPosition = null;
+                _dicaEndereco = null;
+              });
+            }
+          },
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.location_on, color: AppColors.primary),
-            hintText: 'Ex: Rua das Flores, Vila Barth...',
+            suffixIcon: _isLocating
+                ? const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : null,
+            hintText: 'Ex: Centro, Itapetininga',
+            helperText: _dicaEndereco,
             filled: true,
             fillColor: Colors.grey[50],
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[200]!)),
@@ -702,7 +724,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   ),
                 ),
                 TextButton(
-                  onPressed: () => setState(() => _gpsPosition = null),
+                  onPressed: () => setState(() {
+                    _gpsPosition = null;
+                    _dicaEndereco = null;
+                  }),
                   child: const Text('Remover'),
                 ),
               ],

@@ -30,6 +30,8 @@ dependencies:
   geolocator: ^14.1.1
   geocoding: ^5.0.0
   dart_geohash: ^2.1.0
+  # Requisições HTTP (busca de endereço no Nominatim/OpenStreetMap)
+  http: ^1.6.0
 
   # Fonte Inter
   google_fonts: ^6.2.1
