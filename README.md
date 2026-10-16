@@ -63,10 +63,10 @@ npm test                                  # lógica pura dos alertas
 firebase deploy --only functions          # publicar
 ```
 
-### Regras de segurança
+### Regras de segurança e índices (inclui a política TTL do chat)
 
 ```bash
-firebase deploy --only firestore:rules,storage
+firebase deploy --only firestore:rules,firestore:indexes,storage
 ```
 
 ## Estrutura
@@ -90,6 +90,7 @@ lib/
 └── main.dart   → inicializa o Firebase e escolhe Login ou tela principal
 functions/      → Cloud Function dos alertas (index.js) + lógica pura (alertas.js) e testes
 firestore.rules / storage.rules → regras de segurança
+firestore.indexes.json → configuração de campos (TTL de messages.expireAt)
 docs/SUBSIDIOS_TG.md → material técnico para o texto do TG
 PROGRESSO.md    → andamento, decisões e passos manuais
 ```

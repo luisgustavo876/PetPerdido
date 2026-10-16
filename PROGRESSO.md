@@ -18,7 +18,7 @@ Firestore e do Storage publicadas e validadas por REST.
 | 2 | IA (Gemini) | ✅ Código pronto · ⏸️ **você** ativa o AI Logic no console |
 | 3 | Geofencing + Push | ✅ Function publicada (16/10) e testada ponta a ponta |
 | 4 | 7 Pontos e recompensas | ✅ Feito |
-| 5 | 8 Chat | ✅ Feito · ⏸️ **você** cria a política TTL |
+| 5 | 8 Chat | ✅ Feito (TTL publicado por código) |
 | 6 | 9 Configurações, perfil e LGPD | ✅ Feito |
 | 7 | Fechamento (limpeza, regras, README, docs/SUBSIDIOS_TG.md) | ✅ Feito |
 
@@ -162,7 +162,7 @@ Firestore e do Storage publicadas e validadas por REST.
 - **Palavrões:** lista em `lib/core/filtro_palavroes.dart`, comparação por palavra inteira, sem acento
   e sem diferenciar maiúsculas; palavras ambíguas do dia a dia ("pau", "rola", "pinto") ficam de fora.
 - **15 dias:** o app esconde mensagens com mais de 15 dias e grava `expireAt` = envio + 15 dias para a
-  política TTL apagar do banco. (O INSTRUCTIONS fala em "15 dias de inatividade"; segui o roteiro:
+  política TTL apagar do banco (política definida em `firestore.indexes.json`). (O INSTRUCTIONS fala em "15 dias de inatividade"; segui o roteiro:
   15 dias por mensagem.)
 - O banner do chat orienta a combinar a entrega em local público e a não enviar endereço/CPF.
 - **Excluir conta — ordem:** reautentica com a senha → apaga posts do usuário (com avistamentos e
@@ -196,14 +196,11 @@ Hoje a API responde 403 "Firebase AI Logic API has not been used ... or it is di
 5. Se aparecer a sugestão de ativar o App Check, pode pular por enquanto (recomendado só em produção).
 6. Espere uns 5 minutos e teste: Criar postagem → foto de cão ou gato → **Preencher com IA**.
 
-### 3. Criar a política TTL das mensagens do chat
-1. Abra https://console.cloud.google.com/firestore/databases/-default-/ttl?project=petperdido-ff844
-   (ou, no console do Firebase, Firestore → aba **TTL**, se aparecer).
-2. Clique em **Criar política** ("Create policy").
-3. Em **Grupo de coleções** digite `messages`.
-4. Em **Campo de carimbo de data/hora** digite `expireAt`.
-5. Clique em **Criar**. Leva alguns minutos para ficar "Ativa"; o Firestore apaga as mensagens
-   vencidas sozinho (até 24 h depois da data).
+### 3. ~~Criar a política TTL das mensagens do chat~~ — feito por código (16/10/2026)
+`firestore.indexes.json` tem um `fieldOverrides` com `ttl: true` em `messages.expireAt` (mantendo os
+índices simples padrão do campo). Publicado com `firebase deploy --only firestore:indexes`; logo após
+o deploy a política estava `CREATING` e passa a `ACTIVE` em alguns minutos. Para conferir:
+`firebase firestore:indexes` (mostra `ttl: true`) ou a aba TTL do Firestore no console do Google Cloud.
 
 ### 4. Restringir a chave do Google Maps
 A chave `AIzaSyC9iSb...` está no `AndroidManifest.xml`, no `AppDelegate.swift` e no `web/index.html`.

@@ -50,7 +50,7 @@ implementado** (outubro de 2026). Cada seção pode ser adaptada para o capítul
 | `posts/{id}` | userId, userName, type (perdi/achei/avistei), petName, description, species, breed, size, sex, colors[], traits[], tags[], lastSeenAddress (bairro), latitude, longitude (arredondadas), geohash, photoUrl, createdAt, eventAt, isResolved, sightingsCount, helpersCount | Leitura pública; só o autor altera. |
 | `posts/{id}/sightings/{uid}` | userId, userName, address (bairro), lat, lng (arredondadas), notes, photoUrl?, createdAt | Id = uid de quem viu → no máximo 1 por pessoa. |
 | `chats/{postId_uidA_uidB}` | participants[2], participantNames{uid: nome}, postId, postTitle, lastMessage, lastMessageAt, unread{uid: n} | Id determinístico (uids em ordem alfabética). |
-| `chats/{id}/messages/{id}` | senderId, text, photoUrl?, createdAt, expireAt | `expireAt` = envio + 15 dias (política TTL). |
+| `chats/{id}/messages/{id}` | senderId, text, photoUrl?, createdAt, expireAt | `expireAt` = envio + 15 dias. A política TTL do Firestore (definida em código, `firestore.indexes.json`) apaga a mensagem depois dessa data. |
 
 **Storage:** `posts/{postId}/foto.jpg`, `posts/{postId}/avistamento_{uid}.jpg` e
 `chats/{chatId}/{mensagemId}.jpg` (imagens de até 5 MB).
