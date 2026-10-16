@@ -147,6 +147,10 @@ Firestore e do Storage publicadas e validadas por REST.
   formato na criação e que são 2 pessoas diferentes. Depois de criada, só mudam `lastMessage`,
   `lastMessageAt` e `unread`. Mensagens: só participantes leem; cada um cria em nome próprio.
   Lista de conversas: `participants array-contains` e ordenação no app (sem índice composto).
+- **Chat — só com o autor do post (fix 16/10):** a criação exige que o post de `postId` exista, que o
+  autor dele seja um dos 2 participantes e que quem cria NÃO seja o autor (no app quem chama é quem
+  quer ajudar; o autor só responde). Toda mensagem precisa de `expireAt` do tipo timestamp.
+  Validado por REST (21/21) e conferido pelo MCP (nada sobrou em `chats`).
 - **Chat — Storage sem IAM:** a regra de `chats/{chatId}/` verifica se o uid de quem pede está dentro
   do `chatId` (que já foi validado no Firestore). Assim não precisa da regra cruzada Storage→Firestore,
   que exigiria liberar permissão no IAM.

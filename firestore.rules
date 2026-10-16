@@ -58,13 +58,22 @@ service cloud.firestore {
       // list só com o filtro "participants array-contains meu uid".
       allow list: if logado() && request.auth.uid in resource.data.participants;
 
+      // Só quem quer ajudar abre a conversa, e sempre com o AUTOR de um post
+      // que existe (ninguém abre conversa com um estranho qualquer).
+      function autorDoPost() {
+        return get(/databases/$(database)/documents/posts/$(request.resource.data.postId)).data.userId;
+      }
+
       allow create: if logado()
         && request.resource.data.participants.size() == 2
         && request.auth.uid in request.resource.data.participants
         && request.resource.data.participants[0] < request.resource.data.participants[1]
         && chatId == request.resource.data.postId + '_'
              + request.resource.data.participants[0] + '_'
-             + request.resource.data.participants[1];
+             + request.resource.data.participants[1]
+        && exists(/databases/$(database)/documents/posts/$(request.resource.data.postId))
+        && autorDoPost() in request.resource.data.participants
+        && autorDoPost() != request.auth.uid;
 
       // Só a prévia da última mensagem e os contadores de não lidas mudam.
       allow update: if participante()
@@ -79,7 +88,10 @@ service cloud.firestore {
             get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
         }
         allow read: if participanteDoChat();
-        allow create: if participanteDoChat() && request.resource.data.senderId == request.auth.uid;
+        // expireAt (data de expiração, usada pela política TTL) é obrigatório.
+        allow create: if participanteDoChat()
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.expireAt is timestamp;
         allow delete: if participanteDoChat() && resource.data.senderId == request.auth.uid;
       }
     }

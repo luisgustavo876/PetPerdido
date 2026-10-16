@@ -66,8 +66,10 @@ implementado** (outubro de 2026). Cada seção pode ser adaptada para o capítul
 - **Users e subcoleções:** só o dono. Notificações: o dono só pode alterar o campo `read`; ninguém as
   cria pelo app. Pontos e resgates: criar e apagar, nunca editar.
 - **Chats:** só os 2 participantes leem e escrevem; a criação confere o formato do id
-  (`postId_uidA_uidB`) e que são duas pessoas diferentes; depois só mudam a última mensagem e as
-  não lidas. Cada mensagem é criada em nome do próprio remetente.
+  (`postId_uidA_uidB`), que são duas pessoas diferentes, que o post existe e que o **autor do post**
+  é um dos participantes — e quem abre a conversa é quem quer ajudar, nunca o autor (assim ninguém
+  inicia conversa com um estranho). Depois só mudam a última mensagem e as não lidas. Cada mensagem
+  é criada em nome do próprio remetente e precisa ter `expireAt` (data de expiração do TTL).
 - **Storage:** fotos de posts com leitura pública e envio só por usuário logado (imagem ≤ 5 MB); fotos
   do chat só para participantes (o uid precisa estar no id da conversa); o resto do bucket é bloqueado.
 - Todas as regras foram **publicadas e validadas por API REST** com usuários de teste (ver seção 8).
@@ -164,6 +166,7 @@ no fim e confirmando a exclusão:**
 | 8 — Chat | 35 | Id determinístico, sem conversa consigo mesmo, terceiro bloqueado no Firestore e no Storage. |
 | 9 — Excluir conta | 33 | A sequência completa de exclusão passa pelas regras e não deixa dados. |
 | Fechamento | 11 | Autor não troca o dono do post; resolvido e "Eu vi" seguem funcionando. |
+| Chat × autor | 21 | Conversa só com o autor de um post existente; estranho e post inexistente bloqueados; mensagem sem `expireAt` bloqueada. |
 
 **Validação manual (roteiro no PROGRESSO.md):** fluxo completo no Chrome e no celular Android
 (cadastro, criar post com IA, mapa, feed, detalhe, chat, alertas push, pontos, configurações).
