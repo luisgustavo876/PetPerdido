@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../core/app_colors.dart';
-import '../../../models/post_model.dart';
-import '../post_draft.dart';
 import '../../../core/pet_options.dart';
+import '../../../models/post_model.dart';
+import '../../../services/ai_service.dart';
+import '../post_draft.dart';
+import 'botao_ia.dart';
 import 'post_form_ui.dart';
 
 /// Etapa 3 — Sobre o pet: nome (só Perdi), espécie, cor, raça, porte, sexo,
@@ -32,34 +34,77 @@ class StepPet extends StatelessWidget {
           ),
           const SizedBox(height: 24),
         ],
-        const RotuloSecao('Espécie'),
+        RotuloSecao('Espécie', complemento: _selo('especie')),
         _especies(),
         const SizedBox(height: 24),
         RotuloSecao(
           'Cor',
-          complemento: Text(
-            'até ${PetOptions.maxCores} · ${draft.colors.length} escolhida(s)',
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          complemento: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_selo('cores') != null) ...[
+                _selo('cores')!,
+                const SizedBox(width: 8),
+              ],
+              Text(
+                'até ${PetOptions.maxCores} · ${draft.colors.length} escolhida(s)',
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ],
           ),
         ),
         _cores(),
         const SizedBox(height: 24),
-        const RotuloSecao('Raça'),
+        RotuloSecao('Raça', complemento: _selo('raca')),
         _raca(),
         const SizedBox(height: 24),
-        const RotuloSecao('Porte'),
+        RotuloSecao('Porte', complemento: _selo('porte')),
         _portes(),
         const SizedBox(height: 24),
         const RotuloSecao('Sexo'),
         _sexos(),
         const SizedBox(height: 24),
-        const RotuloSecao('Características'),
+        RotuloSecao('Características', complemento: _selo('caracteristicas')),
         _caracteristicas(),
         const SizedBox(height: 24),
         const RotuloSecao('Descrição'),
         _descricao(),
+        // Avistei sem foto: a IA preenche a partir do texto digitado.
+        if (draft.type == PostType.sighted && draft.imageBytes == null) ...[
+          const SizedBox(height: 16),
+          BotaoIA(
+            rotulo: 'Preencher a partir da descrição',
+            avisoPrivacidade:
+                'A descrição é enviada à IA do Google (Gemini) só para '
+                'identificar espécie, porte, cor e raça.',
+            mensagemSucesso: 'Pronto! Confira os campos marcados acima.',
+            analisar: () {
+              final texto = draft.descriptionController.text.trim();
+              if (texto.length < 10) {
+                throw const IAException(
+                    'Escreva a descrição primeiro (mínimo de 10 caracteres).');
+              }
+              return AIService.analisarDescricao(texto);
+            },
+            aoSugerir: (sugestao) {
+              draft.aplicarSugestao(sugestao);
+              onChanged();
+            },
+          ),
+        ],
       ],
     );
+  }
+
+  /// Selo "Sugerido pela IA" se o campo veio da IA e ainda não foi mexido.
+  Widget? _selo(String campo) =>
+      draft.sugeridosPelaIA.contains(campo) ? const SeloIA() : null;
+
+  /// O usuário mexeu no campo: ele deixa de ser "sugerido pela IA".
+  void _editou(String campo) {
+    draft.sugeridosPelaIA.remove(campo);
+    onChanged();
   }
 
   Widget _especies() {
@@ -76,7 +121,8 @@ class StepPet extends StatelessWidget {
                 if (draft.species == especie) return;
                 draft.species = especie;
                 draft.breed = PetOptions.racaPadrao; // raças mudam por espécie
-                onChanged();
+                draft.sugeridosPelaIA.remove('raca');
+                _editou('especie');
               },
               child: Column(
                 children: [
@@ -131,7 +177,7 @@ class StepPet extends StatelessWidget {
                 ? null
                 : (marcado) {
                     marcado ? draft.colors.add(nome) : draft.colors.remove(nome);
-                    onChanged();
+                    _editou('cores');
                   },
           ),
       ],
@@ -141,8 +187,9 @@ class StepPet extends StatelessWidget {
   Widget _raca() {
     final racas = PetOptions.racas[draft.species] ?? const [PetOptions.racaPadrao];
     return Autocomplete<String>(
-      // Recria o campo quando a espécie muda (a raça volta ao padrão).
-      key: ValueKey(draft.species),
+      // Recria o campo quando a espécie muda (a raça volta ao padrão) ou
+      // quando a IA sugere uma raça nova.
+      key: ValueKey('${draft.species}-${draft.versaoIA}'),
       initialValue: TextEditingValue(text: draft.breed),
       optionsBuilder: (valor) {
         final busca = valor.text.trim().toLowerCase();
@@ -153,7 +200,7 @@ class StepPet extends StatelessWidget {
       },
       onSelected: (raca) {
         draft.breed = raca;
-        onChanged();
+        _editou('raca');
       },
       fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
         return TextField(
@@ -162,7 +209,7 @@ class StepPet extends StatelessWidget {
           textCapitalization: TextCapitalization.words,
           onChanged: (texto) {
             draft.breed = texto;
-            onChanged();
+            _editou('raca');
           },
           decoration: const InputDecoration(
             hintText: 'Comece a digitar para ver sugestões',
@@ -185,7 +232,7 @@ class StepPet extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
               onTap: () {
                 draft.size = porte;
-                onChanged();
+                _editou('porte');
               },
               child: Column(
                 children: [
@@ -281,7 +328,7 @@ class StepPet extends StatelessWidget {
             ),
             onSelected: (marcado) {
               marcado ? draft.traits.add(item) : draft.traits.remove(item);
-              onChanged();
+              _editou('caracteristicas');
             },
           ),
       ],

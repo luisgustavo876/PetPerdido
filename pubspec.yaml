@@ -18,6 +18,8 @@ dependencies:
   firebase_auth: ^5.2.0
   cloud_firestore: ^5.4.0
   firebase_storage: ^12.3.0
+  # IA (Gemini) pelo Firebase AI Logic — sem chave de API no app
+  firebase_ai: ^2.3.0
 
   # Mapa
   google_maps_flutter: ^2.5.3
@@ -25,6 +27,8 @@ dependencies:
   # Imagens (seleção de foto e cache de imagens da rede)
   image_picker: ^1.0.7
   cached_network_image: ^3.3.1
+  # Reduzir a foto antes de enviar à IA
+  image: ^4.12.0
 
   # Localização (GPS, endereço <-> coordenadas, geohash para buscas por região)
   geolocator: ^14.1.1

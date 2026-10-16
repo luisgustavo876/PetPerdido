@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/app_constants.dart';
 import '../../models/post_model.dart';
+import '../../models/sugestao_ia.dart';
 import '../../services/location_service.dart';
 import '../../core/pet_options.dart';
 
@@ -42,7 +43,42 @@ class PostDraft {
   QuandoAconteceu quando = QuandoAconteceu.agora;
   DateTime? dataEscolhida; // usada quando quando == escolhido
 
+  /// Campos preenchidos pela IA que o usuário ainda não mexeu
+  /// (mostram o selo "Sugerido pela IA"): especie, porte, cores, raca,
+  /// caracteristicas.
+  final Set<String> sugeridosPelaIA = {};
+
+  /// Aumenta a cada sugestão aplicada (recria o campo de raça com o valor novo).
+  int versaoIA = 0;
+
   bool get fotoObrigatoria => type != PostType.sighted;
+
+  /// Aplica as sugestões da IA nos campos da etapa "Sobre o pet".
+  /// Tudo continua editável; ao editar, o campo perde o selo.
+  void aplicarSugestao(SugestaoIA s) {
+    versaoIA++;
+    sugeridosPelaIA.clear();
+    if (s.especie != null && PetOptions.especies.containsKey(s.especie)) {
+      species = s.especie!;
+      sugeridosPelaIA.add('especie');
+    }
+    if (s.porte != null) {
+      size = s.porte!;
+      sugeridosPelaIA.add('porte');
+    }
+    if (s.cores.isNotEmpty) {
+      colors
+        ..clear()
+        ..addAll(s.cores.take(PetOptions.maxCores));
+      sugeridosPelaIA.add('cores');
+    }
+    breed = s.raca;
+    sugeridosPelaIA.add('raca');
+    if (s.caracteristicas.isNotEmpty) {
+      traits.addAll(s.caracteristicas);
+      sugeridosPelaIA.add('caracteristicas');
+    }
+  }
 
   /// Título da etapa 4, conforme o tipo do post.
   String get tituloLocal => switch (type) {

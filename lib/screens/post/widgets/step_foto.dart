@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../../core/app_colors.dart';
 import '../../../models/post_model.dart';
+import '../../../services/ai_service.dart';
 import '../../../widgets/seletor_imagem.dart';
 import '../post_draft.dart';
+import 'botao_ia.dart';
 import 'post_form_ui.dart';
 
 /// Etapa 2 — Foto do pet (obrigatória em Perdi e Achei).
@@ -91,6 +93,22 @@ class StepFoto extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 24),
+          BotaoIA(
+            // Nova foto = novo botão (some a mensagem da análise anterior).
+            key: ValueKey(bytes.hashCode),
+            rotulo: 'Preencher com IA',
+            avisoPrivacidade:
+                'A foto é enviada à IA do Google (Gemini) só para identificar '
+                'espécie, porte, cor e raça.',
+            mensagemSucesso:
+                'Pronto! As sugestões já estão na próxima etapa. Confira e ajuste.',
+            analisar: () => AIService.analisarFoto(bytes),
+            aoSugerir: (sugestao) {
+              draft.aplicarSugestao(sugestao);
+              onChanged();
+            },
           ),
         ],
       ],

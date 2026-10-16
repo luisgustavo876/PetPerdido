@@ -13,8 +13,8 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
 | 1 | 4 Mapa | ✅ Feito |
 | 1 | 5 Feed | ✅ Feito |
 | 1 | 6 Detalhe | ✅ Feito |
-| 2 | IA (Gemini) | ⏳ Em andamento |
-| 3 | Geofencing + Push | Pendente |
+| 2 | IA (Gemini) | ✅ Feito (falta você ativar o AI Logic no console) |
+| 3 | Geofencing + Push | ⏳ Em andamento |
 | 4 | 7 Pontos e recompensas | Pendente |
 | 5 | 8 Chat | Pendente |
 | 6 | 9 Configurações, perfil e LGPD | Pendente |
@@ -39,6 +39,10 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
   `posts/{id}/sightings/{uid}` + contadores no mesmo batch; linha do tempo real; favoritar
   (`users/{uid}.favorites`); compartilhar (share_plus); autor marca como resolvido e exclui
   (post + avistamentos + fotos). Regras publicadas e validadas por REST (28/28, tudo limpo).
+- **Módulo IA** — "Preencher com IA" na etapa Foto (foto reduzida para 1024 px, JSON estruturado com
+  `responseSchema`) e "Preencher a partir da descrição" para Avistei sem foto. Sugestões com selo
+  "Sugerido pela IA" na etapa Pet, sempre editáveis. Erros tratados (offline, cota, API desativada,
+  resposta inválida, "não é um pet"). Conversor puro `SugestaoIA.converter` com testes.
 
 ## Decisões de implementação
 
@@ -67,8 +71,32 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
 - Regras: publico com `firebase deploy --only firestore:rules` (após `--dry-run`) e valido logo em
   seguida por REST com 2 usuários de teste; tudo é apagado no fim.
 - Build Android: se aparecer `mergeExtDexDebug` falhando, rodar de novo (erro passageiro do Gradle).
+- **IA — pacote:** `firebase_ai` 2.3.0, a versão compatível com os pacotes Firebase atuais
+  (`firebase_core` 3.15). A versão mais nova (5.0.0, publicada em 15/10/2026) exigiria atualizar todos
+  os pacotes Firebase em duas versões principais a poucos dias da entrega; fica como melhoria futura.
+- **IA — modelo:** `gemini-3.5-flash` (constante `AppConstants.geminiModel`). Pela documentação do
+  Firebase AI Logic (consultada em 16/10/2026), os Flash 3.6/3.7/3.8 são estáveis porém de
+  "disponibilidade de curto prazo"; o 3.5 Flash tem disponibilidade garantida até pelo menos 05/2027.
+  Para trocar, basta mudar a constante.
+- **IA — dados:** a foto é reduzida (máx. 1024 px, JPEG 80) antes de enviar. O prompt manda ignorar
+  pessoas e responder "Indefinido" sem cão/gato. A resposta só é aceita com valores das listas do app
+  (espécie, porte, até 2 cores, características); raça limitada a 40 caracteres.
+- O pacote `firebase_ai` só exporta a classe base de erro; o tipo (cota, API desativada) é reconhecido
+  pela mensagem em `AIService.mensagemDeErro` (testada).
 
 ## Passos manuais pendentes (dependem de você)
+
+### Ativar o Firebase AI Logic (necessário para "Preencher com IA")
+Hoje a API responde 403 "Firebase AI Logic API has not been used ... or it is disabled".
+1. Abra https://console.firebase.google.com/project/petperdido-ff844 e entre com a conta do projeto.
+2. No menu da esquerda, abra **AI Logic** (fica em "Criar" / "Build", às vezes listado como
+   "Gemini" ou "AI").
+3. Clique em **Começar** ("Get started").
+4. Escolha **Gemini Developer API** (não a "Vertex AI Gemini API") e confirme em **Ativar API**
+   ("Enable API"). O console cria e gerencia a chave sozinho — não coloque chave nenhuma no app.
+5. Se aparecer a sugestão de ativar o App Check, pode pular por enquanto (recomendado só em produção).
+6. Espere uns 5 minutos e teste: Criar postagem → escolha uma foto de cão ou gato → **Preencher com IA**.
+   A etapa "Sobre o pet" deve vir com o selo "Sugerido pela IA" nos campos.
 
 - Apagar no console do Firebase os posts antigos de teste (com `createdAt` em texto).
 - `git rm -r windows/` (a pasta não é usada; o Firebase não suporta Windows desktop).

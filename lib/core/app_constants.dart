@@ -27,6 +27,12 @@ class AppConstants {
   /// Evita expor a localização exata de quem publica (LGPD).
   static const int coordDecimals = 3;
 
+  // IA (Firebase AI Logic + Gemini Developer API).
+  // 3.5 Flash: estável com disponibilidade garantida até pelo menos 05/2027
+  // (os Flash mais novos são "short-term availability").
+  static const String geminiModel = 'gemini-3.5-flash';
+  static const int iaMaxPixels = 1024;
+
   // Aviso de posts semelhantes (Perdi x Achei/Avistei)
   static const int similarWindowDays = 7;
   static const double similarMaxKm = 3;
