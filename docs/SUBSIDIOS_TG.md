@@ -167,6 +167,7 @@ no fim e confirmando a exclusão:**
 | 9 — Excluir conta | 33 | A sequência completa de exclusão passa pelas regras e não deixa dados. |
 | Fechamento | 11 | Autor não troca o dono do post; resolvido e "Eu vi" seguem funcionando. |
 | Chat × autor | 21 | Conversa só com o autor de um post existente; estranho e post inexistente bloqueados; mensagem sem `expireAt` bloqueada. |
+| Alertas (ponta a ponta, Function publicada) | 22 | Autor publica post; usuário a ~0,6 km (raio 3 km) recebe o alerta "Pet perdido perto de você — Cão caramelo · Vila Barth, Itapetininga"; usuário a ~12 km e o autor não recebem; token inválido é removido. |
 
 **Validação manual (roteiro no PROGRESSO.md):** fluxo completo no Chrome e no celular Android
 (cadastro, criar post com IA, mapa, feed, detalhe, chat, alertas push, pontos, configurações).

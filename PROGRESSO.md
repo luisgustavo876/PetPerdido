@@ -16,7 +16,7 @@ Firestore e do Storage publicadas e validadas por REST.
 | — | 0 Limpeza · 1 Regras · 2 Login/Cadastro · 3 Criar Post | ✅ Feito |
 | 1 | 4 Mapa · 5 Feed · 6 Detalhe | ✅ Feito |
 | 2 | IA (Gemini) | ✅ Código pronto · ⏸️ **você** ativa o AI Logic no console |
-| 3 | Geofencing + Push | ✅ Código pronto · ⏸️ deploy da Function **espera sua autorização** |
+| 3 | Geofencing + Push | ✅ Function publicada (16/10) e testada ponta a ponta |
 | 4 | 7 Pontos e recompensas | ✅ Feito |
 | 5 | 8 Chat | ✅ Feito · ⏸️ **você** cria a política TTL |
 | 6 | 9 Configurações, perfil e LGPD | ✅ Feito |
@@ -24,9 +24,9 @@ Firestore e do Storage publicadas e validadas por REST.
 
 ### O que falta
 
-1. **Deploy da Cloud Function** (`firebase deploy --only functions`) — só com sua autorização,
-   porque ativa APIs no Google Cloud. Depois dele: teste com 2 usuários de teste (um perto, um longe)
-   e limpeza. **Para retomar:** autorize o deploy; eu publico, testo e registro aqui.
+1. ~~Deploy da Cloud Function~~ — **feito em 16/10/2026** e testado ponta a ponta (22/22): só o usuário
+   a ~0,6 km recebeu o alerta; o de ~12 km e o autor não. Falta só decidir a política de limpeza
+   do Artifact Registry (item 1 dos passos manuais).
 2. Os passos manuais abaixo (console do Firebase/Google e Git).
 3. Seu teste no celular Android (roteiro no fim).
 
@@ -58,7 +58,10 @@ Firestore e do Storage publicadas e validadas por REST.
   toque na notificação abre o post, banner dentro do app, sino com contador e tela "Alertas".
   Cloud Function `alertarProximos` em `functions/` (Node 22, southamerica-east1) com lógica pura
   testada (`npm test`, 9 testes). Regras de `users/{uid}/notifications` publicadas e validadas (13/13).
-  **Falta:** deploy da Function (precisa da sua autorização) e o teste ponta a ponta.
+  **Deploy feito em 16/10/2026** (southamerica-east1) e teste ponta a ponta 22/22: com 3 usuários de
+  teste (autor, um a ~0,6 km e um a ~12 km, raio 3 km), só o de perto recebeu o alerta ("Pet perdido
+  perto de você" · "Cão caramelo · Vila Barth, Itapetininga"); a Function apagou o token falso
+  (push inválido) e o log registrou "1 avisados". Tudo apagado e conferido pelo MCP.
 - **Módulo 7** — pontos reais em `users/{uid}.points` (stream): Achei +30, Avistei +10, "Eu vi" +15
   (uma vez por post), sempre em transação com registro em `pointsLog`; nível com barra de progresso;
   "Como ganhar pontos"; histórico; catálogo de recompensas de exemplo ("Exemplo de parceria", sem
@@ -176,11 +179,12 @@ Firestore e do Storage publicadas e validadas por REST.
 
 ## Passos manuais pendentes (dependem de você)
 
-### 1. Autorizar o deploy da Cloud Function dos alertas
-O código está em `functions/` e testado localmente (`npm test`). O primeiro
-`firebase deploy --only functions` ativa no Google Cloud as APIs necessárias (Cloud Functions,
-Cloud Build, Artifact Registry, Eventarc, Cloud Run, Pub/Sub). O plano Blaze já está ativo.
-Responda "pode fazer o deploy" que eu publico, testo com 2 usuários de teste e apago tudo.
+### 1. (Opcional, envolve custo) Política de limpeza das imagens das Functions
+O deploy funcionou, mas o CLI avisou que não configurou a política que apaga imagens antigas de
+build no Artifact Registry (região southamerica-east1). Sem ela, cada novo deploy guarda uma imagem
+(custo pequeno de armazenamento). Para configurar (apaga imagens com mais de 1 dia):
+`firebase functions:artifacts:setpolicy --location southamerica-east1`
+(ou, no próximo deploy, `firebase deploy --only functions --force`).
 
 ### 2. Ativar o Firebase AI Logic (necessário para "Preencher com IA")
 Hoje a API responde 403 "Firebase AI Logic API has not been used ... or it is disabled".
@@ -234,8 +238,7 @@ no Chrome em `flutter run -d web-server --web-port 8080`).
 1. **Cadastro (Módulo 2):** crie uma conta com CPF inválido (`11111111111`) → "CPF inválido";
    data de nascimento de menos de 16 anos → bloqueia; dados válidos → entra direto no app.
 2. **Alertas (Geofencing):** no aviso "Alertas de pets perto de você" toque em **Ativar alertas** e
-   permita notificações e localização. *(Só depois do deploy da Function:)* com a outra conta, crie um
-   post a menos de 3 km → chega "Pet perdido perto de você"; tocar abre o post; com o app aberto
+   permita notificações e localização. Com a outra conta, crie um post a menos de 3 km → chega "Pet perdido perto de você"; tocar abre o post; com o app aberto
    aparece um banner; o sino mostra o alerta.
 3. **Criar post (Módulo 3 + IA):** Mapa → Criar postagem → "Perdi" → foto (câmera ou galeria) →
    **Preencher com IA** (após ativar o AI Logic) → confira o selo "Sugerido pela IA" → marque o ponto
