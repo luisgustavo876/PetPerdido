@@ -24,6 +24,10 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Para marcar no mapa onde o pet foi visto pela última vez.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Para tirar a foto do pet na hora de criar a postagem.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Para anexar a foto do pet à postagem.</string>
 	<key>LSRequiresIPhoneOS</key>

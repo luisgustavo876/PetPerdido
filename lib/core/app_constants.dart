@@ -20,6 +20,13 @@ class AppConstants {
   static const double defaultLat = -23.5897;
   static const double defaultLng = -48.0533;
 
+  /// Complemento usado ao converter o endereço digitado em coordenadas.
+  static const String defaultCity = 'Itapetininga, SP, Brasil';
+
+  /// Casas decimais das coordenadas salvas nos posts (3 ≈ 100 m).
+  /// Evita expor a localização exata de quem publica (LGPD).
+  static const int coordDecimals = 3;
+
   // Validações (6 é o mínimo aceito pelo Firebase Auth)
   static const int minPasswordLength = 6;
   static const int cpfLength = 11;

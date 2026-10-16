@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petperdido/models/post_model.dart';
 
@@ -32,12 +33,60 @@ void main() {
     expect(copia.petName, 'Pipoca');
     expect(copia.latitude, -23.59);
     expect(copia.createdAt, post.createdAt);
+    expect(copia.geohash, post.geohash);
     expect(copia.traits, ['Dócil']);
   });
 
-  test('PostType converte o valor salvo no Firestore', () {
-    expect(PostType.fromValue('perdi'), PostType.lost);
-    expect(PostType.fromValue('achei'), PostType.found);
-    expect(PostType.fromValue('avistei'), PostType.sighted);
+  test('toMap salva createdAt como Timestamp', () {
+    final createdAt = post.toMap()['createdAt'];
+    expect(createdAt, isA<Timestamp>());
+    expect((createdAt as Timestamp).toDate(), post.createdAt);
+  });
+
+  test('fromMap ainda aceita createdAt em texto (posts antigos)', () {
+    final map = post.toMap()..['createdAt'] = '2026-10-06T14:30:00.000';
+    expect(PostModel.fromMap(map).createdAt, DateTime(2026, 10, 6, 14, 30));
+  });
+
+  group('geohash', () {
+    test('é calculado com precisão 9 e na ordem certa (lat, lng)', () {
+      // Exemplo clássico de geohash: 57.64911, 10.40744 -> u4pruydqq...
+      expect(PostModel.calcularGeohash(57.64911, 10.40744), 'u4pruydqq');
+      expect(post.geohash.length, PostModel.geohashPrecision);
+    });
+
+    test('vai para o Firestore no toMap', () {
+      expect(post.toMap()['geohash'], post.geohash);
+    });
+
+    test('documento sem geohash (post antigo) recebe o valor calculado', () {
+      final map = post.toMap()..remove('geohash');
+      final antigo = PostModel.fromMap(map);
+      expect(antigo.geohash, PostModel.calcularGeohash(-23.59, -48.05));
+    });
+
+    test('copyWith recalcula quando a posição muda', () {
+      final movido = post.copyWith(latitude: 57.64911, longitude: 10.40744);
+      expect(movido.geohash, 'u4pruydqq');
+      expect(post.copyWith(petName: 'Bob').geohash, post.geohash);
+    });
+  });
+
+  group('PostType', () {
+    test('converte o valor salvo no Firestore', () {
+      expect(PostType.fromValue('perdi'), PostType.lost);
+      expect(PostType.fromValue('achei'), PostType.found);
+      expect(PostType.fromValue('avistei'), PostType.sighted);
+    });
+
+    test('valor desconhecido retorna null, sem exceção', () {
+      expect(PostType.fromValue('xyz'), isNull);
+      expect(PostType.fromValue(null), isNull);
+    });
+
+    test('fromMap com tipo desconhecido lança FormatException', () {
+      final map = post.toMap()..['type'] = 'xyz';
+      expect(() => PostModel.fromMap(map), throwsFormatException);
+    });
   });
 }

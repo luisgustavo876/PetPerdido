@@ -1,11 +1,17 @@
+import 'dart:async';
 import 'dart:typed_data';
+import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/app_colors.dart';
 import '../../models/post_model.dart';
 import '../../services/auth_service.dart';
+import '../../services/location_service.dart';
 import '../../services/post_service.dart';
 import '../../services/storage_service.dart';
+
+/// Em que etapa da publicação estamos — usada para escolher a mensagem de erro.
+enum _EtapaPublicacao { upload, salvar }
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
@@ -24,19 +30,43 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _petNameController = TextEditingController();
   final _descController = TextEditingController();
   final _breedController = TextEditingController(text: 'Sem Raça Definida');
-  final _addressController = TextEditingController(text: 'Vila Barth, Itapetininga');
-  
+  final _addressController = TextEditingController();
+
   String _selectedSpecies = 'Cão';
   String _selectedSize = 'Médio';
   String _selectedSex = 'Macho';
-  
+
+  /// Coordenadas do GPS, quando o usuário toca em "Usar minha localização
+  /// atual". Enquanto não for null, têm prioridade sobre o endereço digitado.
+  ({double lat, double lng})? _gpsPosition;
+  bool _isLocating = false;
   bool _isLoading = false;
+
+  /// ID do post, gerado uma vez quando a tela abre. Toda tentativa de
+  /// publicar usa o mesmo id: tentar de novo sobrescreve, não duplica.
+  late final String _postId;
+
+  static const _timeout = Duration(seconds: 30);
+  static const _msgConexaoLenta =
+      'Conexão lenta. Confira no feed se o post apareceu antes de tentar de novo.';
+
+  static const _msgSemLocalizacao =
+      'Não encontramos esse endereço. Ajuste o endereço ou use sua localização atual.';
+
+  /// Foto é obrigatória em Perdi e Achei (opcional em Avistei).
+  bool get _fotoObrigatoria => _selectedType != PostType.sighted;
 
   final List<String> _availableTraits = [
     'Dócil', 'Assustado', 'Com Coleira', 'Sem Coleira',
     'Castrado', 'Ferido', 'Brincalhão', 'Olhos Azuis'
   ];
   final Set<String> _selectedTraits = {'Sem Coleira'};
+
+  @override
+  void initState() {
+    super.initState();
+    _postId = DateTime.now().millisecondsSinceEpoch.toString();
+  }
 
   @override
   void dispose() {
@@ -65,70 +95,138 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
-  void _onPublish() async {
+  void _mostrarMensagem(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  /// Botão "Usar minha localização atual": GPS + bairro por geocoding reverso.
+  Future<void> _usarLocalizacaoAtual() async {
+    setState(() => _isLocating = true);
+    try {
+      final pos = await LocationService.posicaoAtual();
+      final bairro = await LocationService.bairroDe(pos.lat, pos.lng);
+      if (!mounted) return;
+      setState(() {
+        _gpsPosition = pos;
+        if (bairro != null) _addressController.text = bairro;
+      });
+      if (bairro == null) {
+        // Ex.: na Web o geocoding não funciona — a posição vale, falta o nome.
+        _mostrarMensagem(
+            'Localização obtida. Digite o bairro no campo de endereço.');
+      }
+    } on LocationException catch (e) {
+      if (mounted) _mostrarMensagem(e.message);
+    } finally {
+      if (mounted) setState(() => _isLocating = false);
+    }
+  }
+
+  /// Regras de negócio do post. Retorna a mensagem de erro ou null.
+  String? _validar() {
+    if (_selectedType == PostType.lost &&
+        _petNameController.text.trim().isEmpty) {
+      return 'Informe o nome do pet.';
+    }
+    if (_fotoObrigatoria && _selectedImageFile == null) {
+      return 'A foto é obrigatória para "${_selectedType.label}".';
+    }
     if (_descController.text.trim().length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, descreva o pet com pelo menos 10 caracteres.')),
-      );
+      return 'Descreva o pet com pelo menos 10 caracteres.';
+    }
+    if (_addressController.text.trim().isEmpty) {
+      return 'Informe o endereço ou bairro, ou use sua localização atual.';
+    }
+    return null;
+  }
+
+  /// Mensagem de erro em português conforme a etapa e o código do Firebase.
+  String _mensagemDeErro(Object erro, _EtapaPublicacao etapa) {
+    if (erro is TimeoutException) return _msgConexaoLenta;
+    final codigo = erro is FirebaseException ? erro.code : '';
+    if (const ['unavailable', 'network-request-failed', 'retry-limit-exceeded']
+        .contains(codigo)) {
+      return 'Sem conexão com a internet. Tente novamente.';
+    }
+    if (codigo == 'permission-denied' || codigo == 'unauthorized') {
+      return etapa == _EtapaPublicacao.upload
+          ? 'Sem permissão para enviar a foto. Entre na conta novamente.'
+          : 'Sem permissão para publicar. Entre na conta novamente.';
+    }
+    return etapa == _EtapaPublicacao.upload
+        ? 'Falha ao enviar a foto. Tente novamente.'
+        : 'Não foi possível publicar. Tente novamente.';
+  }
+
+  Future<void> _onPublish() async {
+    final erro = _validar();
+    if (erro != null) {
+      _mostrarMensagem(erro);
+      return;
+    }
+
+    final user = AuthService.currentUser;
+    if (user == null) {
+      _mostrarMensagem('Entre na sua conta para publicar.');
       return;
     }
 
     setState(() => _isLoading = true);
-
-    // Coordenadas aproximadas em Itapetininga, SP
-    final double lat = -23.5897 + (DateTime.now().millisecond % 100) * 0.0003;
-    final double lng = -48.0533 + (DateTime.now().microsecond % 100) * 0.0003;
-
-    // ID único do post (gerado antes do upload para usar como pasta no Storage)
-    final String postId = DateTime.now().millisecondsSinceEpoch.toString();
-
-    // Upload da foto para o Firebase Storage (se houver)
-    String? photoUrl;
-    if (_selectedImageFile != null) {
-      try {
-        photoUrl = await StorageService.uploadPostImage(_selectedImageFile!, postId);
-      } catch (e) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Erro ao enviar a foto. Tente novamente.')),
-          );
-        }
+    var etapa = _EtapaPublicacao.upload;
+    try {
+      // Coordenadas: GPS, se o usuário usou; senão, o endereço digitado.
+      final pos = _gpsPosition ??
+          await LocationService.coordenadasDe(_addressController.text.trim());
+      if (pos == null) {
+        if (mounted) _mostrarMensagem(_msgSemLocalizacao);
         return;
       }
-    }
 
-    final user = AuthService.currentUser;
-    final newPost = PostModel(
-      id: postId,
-      userId: user?.uid ?? 'anon',
-      userName: AuthService.currentUserName,
-      type: _selectedType,
-      petName: _selectedType == PostType.lost ? _petNameController.text.trim() : 'Sem nome',
-      description: _descController.text.trim(),
-      tags: [_selectedSpecies, _breedController.text.trim(), _selectedSize],
-      lastSeenAddress: _addressController.text.trim(),
-      latitude: lat,
-      longitude: lng,
-      photoUrl: photoUrl,  // URL real do Firebase Storage (ou null)
-      createdAt: DateTime.now(),
-      breed: _breedController.text.trim(),
-      species: _selectedSpecies,
-      size: _selectedSize,
-      sex: _selectedSex,
-      points: 0,
-      helpersCount: 0,
-      sightingsCount: 0,
-      ownerAvatar: user?.photoURL,
-      traits: _selectedTraits.toList(),
-    );
+      // Privacidade: arredonda para ~100 m (GPS ou endereço). O geohash é
+      // calculado pelo PostModel a partir destes valores já arredondados.
+      final lat = LocationService.arredondar(pos.lat);
+      final lng = LocationService.arredondar(pos.lng);
 
-    await PostService.createPost(newPost);
+      String? photoUrl;
+      if (_selectedImageFile != null) {
+        photoUrl = await StorageService.uploadPostImage(
+                _selectedImageFile!, _postId)
+            .timeout(_timeout);
+      }
 
-    setState(() => _isLoading = false);
+      etapa = _EtapaPublicacao.salvar;
+      await PostService.createPost(PostModel(
+        id: _postId,
+        userId: user.uid,
+        userName: AuthService.currentUserName,
+        type: _selectedType,
+        petName: _selectedType == PostType.lost
+            ? _petNameController.text.trim()
+            : 'Sem nome',
+        description: _descController.text.trim(),
+        tags: [_selectedSpecies, _breedController.text.trim(), _selectedSize],
+        lastSeenAddress: _addressController.text.trim(),
+        latitude: lat,
+        longitude: lng,
+        photoUrl: photoUrl,
+        createdAt: DateTime.now(),
+        breed: _breedController.text.trim(),
+        species: _selectedSpecies,
+        size: _selectedSize,
+        sex: _selectedSex,
+        points: 0,
+        helpersCount: 0,
+        sightingsCount: 0,
+        ownerAvatar: user.photoURL,
+        traits: _selectedTraits.toList(),
+      )).timeout(_timeout);
 
-    if (mounted) {
-      _showSuccessDialog(context);
+      if (mounted) _showSuccessDialog(context);
+    } catch (e) {
+      debugPrint('Erro ao publicar post ($etapa): $e');
+      if (mounted) _mostrarMensagem(_mensagemDeErro(e, etapa));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -374,19 +472,23 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     borderRadius: BorderRadius.circular(16),
                     child: Image.memory(_imageBytes!, fit: BoxFit.cover),
                   )
-                : const Column(
+                : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.add_a_photo_outlined, size: 36, color: Colors.grey),
-                      SizedBox(height: 8),
-                      Text(
+                      const Icon(Icons.add_a_photo_outlined, size: 36, color: Colors.grey),
+                      const SizedBox(height: 8),
+                      const Text(
                         'Toque para escolher uma foto',
                         style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 13),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
-                        'Câmera ou galeria',
-                        style: TextStyle(color: Colors.grey, fontSize: 11),
+                        _fotoObrigatoria ? 'Obrigatória' : 'Opcional',
+                        style: TextStyle(
+                          color: _fotoObrigatoria ? AppColors.primary : Colors.grey,
+                          fontSize: 11,
+                          fontWeight: _fotoObrigatoria ? FontWeight.w600 : FontWeight.normal,
+                        ),
                       ),
                     ],
                   ),
@@ -554,7 +656,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Endereço ou bairro (movido do antigo Step 3)
+        // Onde o pet foi visto: endereço digitado OU localização do GPS
         const Text('Endereço ou Bairro', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         const SizedBox(height: 8),
         TextField(
@@ -567,6 +669,45 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[200]!)),
           ),
         ),
+        const SizedBox(height: 8),
+        if (_gpsPosition == null)
+          TextButton.icon(
+            onPressed: _isLocating ? null : _usarLocalizacaoAtual,
+            icon: _isLocating
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.my_location, size: 18),
+            label: Text(_isLocating ? 'Obtendo localização...' : 'Usar minha localização atual'),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+          )
+        else
+          // Deixa claro que o GPS está sendo usado, com opção de desfazer.
+          Container(
+            padding: const EdgeInsets.only(left: 12),
+            decoration: BoxDecoration(
+              color: AppColors.primarySurface,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.gps_fixed, size: 16, color: AppColors.primary),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Usando sua localização atual no mapa',
+                    style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => setState(() => _gpsPosition = null),
+                  child: const Text('Remover'),
+                ),
+              ],
+            ),
+          ),
         const SizedBox(height: 16),
       ],
     );

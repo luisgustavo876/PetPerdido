@@ -26,6 +26,11 @@ dependencies:
   image_picker: ^1.0.7
   cached_network_image: ^3.3.1
 
+  # Localização (GPS, endereço <-> coordenadas, geohash para buscas por região)
+  geolocator: ^14.1.1
+  geocoding: ^5.0.0
+  dart_geohash: ^2.1.0
+
   # Fonte Inter
   google_fonts: ^6.2.1
 
