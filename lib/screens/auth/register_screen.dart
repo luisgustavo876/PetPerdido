@@ -1,4 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
+import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -22,6 +23,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _cpfController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
+  final _birthController = TextEditingController(); // só exibe dd/mm/aaaa
+  DateTime? _birthDate;
   bool _isLoading = false;
 
   @override
@@ -31,7 +34,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _cpfController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
+    _birthController.dispose();
     super.dispose();
+  }
+
+  /// Formata a data como dd/mm/aaaa.
+  String _formatarData(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  Future<void> _pickBirthDate() async {
+    final hoje = DateTime.now();
+    final escolhida = await showDatePicker(
+      context: context,
+      initialDate: _birthDate ?? DateTime(hoje.year - 18, hoje.month, hoje.day),
+      firstDate: DateTime(1900),
+      lastDate: hoje,
+      helpText: 'Data de nascimento',
+      cancelText: 'Cancelar',
+      confirmText: 'OK',
+      fieldLabelText: 'Data de nascimento',
+      fieldHintText: 'dd/mm/aaaa',
+      errorFormatText: 'Use o formato dd/mm/aaaa',
+      errorInvalidText: 'Data fora do intervalo permitido',
+    );
+    if (escolhida == null) return;
+    setState(() {
+      _birthDate = escolhida;
+      _birthController.text = _formatarData(escolhida);
+    });
   }
 
   Future<void> _onRegister() async {
@@ -43,9 +73,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         name: _nameController.text,
         email: _emailController.text,
         password: _passwordController.text,
-        cpf: _cpfController.text, // Salvo no Firestore
+        cpf: _cpfController.text,
+        birthDate: _birthDate!,
       );
-      // Roteamento via authStateChanges no main.dart
+      // Conta e documento users/{uid} gravados. A RegisterScreen está
+      // empilhada sobre o _AuthGate (que já mostra a MainScreen): volta até ele.
+      if (!mounted) return;
+      Navigator.of(context).popUntil((r) => r.isFirst);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -53,10 +87,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'email-already-in-use' => 'Este e-mail já está cadastrado.',
         'weak-password' => 'Senha muito fraca.',
         'invalid-email' => 'E-mail inválido.',
+        'network-request-failed' => 'Sem conexão com a internet. Tente novamente.',
+        'too-many-requests' => 'Muitas tentativas. Tente mais tarde.',
         _ => 'Erro ao cadastrar. Tente novamente.',
       };
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(msg)));
+    } on FirebaseException catch (_) {
+      // Falha ao gravar users/{uid}: o AuthService já desfez a conta.
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível salvar seus dados. Tente novamente.'),
+        ),
+      );
     } catch (_) {
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -111,7 +156,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Você precisa ter ao menos 16 anos para se cadastrar.',
+                  'Você precisa ter ao menos ${AppConstants.minAge} anos para se cadastrar.',
                   style: GoogleFonts.inter(
                       fontSize: 14, color: AppColors.textSecondary),
                 ),
@@ -155,6 +200,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (!AuthService.validarCpf(v)) return 'CPF inválido';
                     return null;
                   },
+                ),
+                const SizedBox(height: 14),
+                // Campo só de leitura: abre o calendário ao tocar.
+                TextFormField(
+                  controller: _birthController,
+                  readOnly: true,
+                  onTap: _pickBirthDate,
+                  decoration: const InputDecoration(
+                    labelText: 'Data de nascimento',
+                    hintText: 'dd/mm/aaaa',
+                    hintStyle: TextStyle(color: AppColors.textSecondary),
+                    prefixIcon: Icon(Icons.cake_outlined,
+                        color: AppColors.textSecondary, size: 20),
+                  ),
+                  validator: (_) =>
+                      AuthService.validarNascimento(_birthDate, DateTime.now()),
                 ),
                 const SizedBox(height: 14),
                 CustomTextField(

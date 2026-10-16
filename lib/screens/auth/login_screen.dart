@@ -44,8 +44,10 @@ class _LoginScreenState extends State<LoginScreen> {
       final msg = switch (e.code) {
         'user-not-found' || 'wrong-password' || 'invalid-credential' =>
           'E-mail ou senha incorretos.',
+        'invalid-email' => 'E-mail inválido.',
         'user-disabled' => 'Conta desabilitada.',
         'too-many-requests' => 'Muitas tentativas. Tente mais tarde.',
+        'network-request-failed' => 'Sem conexão com a internet. Tente novamente.',
         _ => 'Erro ao entrar. Tente novamente.',
       };
       ScaffoldMessenger.of(context)
@@ -246,6 +248,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       }
                     } catch (_) {
                       if (ctx.mounted) Navigator.pop(ctx);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Não foi possível enviar o e-mail. Confira o endereço.'),
+                          ),
+                        );
+                      }
                     }
                   },
                   child: const Text('Enviar link'),

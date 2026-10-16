@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/app_constants.dart';
 import 'core/app_routes.dart';
 import 'core/app_theme.dart';
@@ -26,6 +27,14 @@ class PetPerdidoApp extends StatelessWidget {
       title: AppConstants.appName,
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
+      // App inteiro em português do Brasil (calendário, botões padrão etc.)
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('pt', 'BR')],
+      locale: const Locale('pt', 'BR'),
       routes: AppRoutes.routes,
       home: const _AuthGate(),
     );

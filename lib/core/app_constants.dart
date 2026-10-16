@@ -23,4 +23,8 @@ class AppConstants {
   // Validações (6 é o mínimo aceito pelo Firebase Auth)
   static const int minPasswordLength = 6;
   static const int cpfLength = 11;
+  static const int minAge = 16;
+
+  // Pontos com que todo usuário novo começa
+  static const int initialPoints = 0;
 }
