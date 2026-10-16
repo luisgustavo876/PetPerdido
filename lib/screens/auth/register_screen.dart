@@ -8,6 +8,7 @@ import '../../core/app_constants.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
+import '../legal/legal_screens.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -254,7 +255,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                 Center(
                   child: Text(
-                    'Ao criar sua conta, você concorda com nossos\nTermos de Uso e Política de Privacidade.',
+                    'Ao criar sua conta, você concorda com nossos',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
                       fontSize: 12,
@@ -262,6 +263,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       height: 1.5,
                     ),
                   ),
+                ),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const TermosScreen())),
+                      child: const Text('Termos de Uso'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const PrivacidadeScreen())),
+                      child: const Text('Política de Privacidade'),
+                    ),
+                  ],
                 ),
 
                 const SizedBox(height: 32),

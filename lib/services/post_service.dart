@@ -39,6 +39,16 @@ class PostService {
   static Future<List<PostModel>> postsRecentes() async =>
       _converter(await _recentes.get());
 
+  /// Posts de um autor (Meus posts), mais recentes primeiro.
+  /// Só filtra por igualdade e ordena no app: sem índice composto.
+  static Future<List<PostModel>> postsDoAutor(String uid) async {
+    final snap =
+        await _db.collection(_col).where('userId', isEqualTo: uid).get();
+    final posts = _converter(snap)
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return posts;
+  }
+
   /// Um post pelo id (ex.: ao abrir uma notificação). Null se não existir.
   static Future<PostModel?> buscarPost(String id) async {
     final snap = await _db.collection(_col).doc(id).get();

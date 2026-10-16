@@ -13,6 +13,42 @@ class PreferenciasAlerta {
   const PreferenciasAlerta({this.ativo, this.raioKm = AppConstants.alertRadiusPadraoKm});
 }
 
+/// Dados do perfil (users/{uid}) mostrados nas Configurações.
+class Perfil {
+  final String nome;
+  final String email;
+  final String cpf;
+  final int pontos;
+  final bool alertasAtivos;
+  final int raioKm;
+
+  const Perfil({
+    required this.nome,
+    required this.email,
+    required this.cpf,
+    required this.pontos,
+    required this.alertasAtivos,
+    required this.raioKm,
+  });
+
+  factory Perfil.fromMap(Map<String, dynamic> m) => Perfil(
+        nome: m['name'] as String? ?? '',
+        email: m['email'] as String? ?? '',
+        cpf: m['cpf'] as String? ?? '',
+        pontos: (m['points'] as num?)?.toInt() ?? 0,
+        alertasAtivos: m['alertsEnabled'] as bool? ?? false,
+        raioKm: (m['alertRadiusKm'] as num?)?.toInt() ??
+            AppConstants.alertRadiusPadraoKm,
+      );
+
+  /// CPF mascarado para exibir: "***.456.789-**". Função pura.
+  static String mascararCpf(String cpf) {
+    final d = cpf.replaceAll(RegExp(r'\D'), '');
+    if (d.length != AppConstants.cpfLength) return '***.***.***-**';
+    return '***.${d.substring(3, 6)}.${d.substring(6, 9)}-**';
+  }
+}
+
 /// Dados do usuário logado em users/{uid} e subcoleções.
 class UserService {
   static final _db = FirebaseFirestore.instance;
@@ -20,6 +56,29 @@ class UserService {
   static DocumentReference<Map<String, dynamic>>? get _meuDoc {
     final uid = AuthService.currentUser?.uid;
     return uid == null ? null : _db.collection('users').doc(uid);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Perfil
+  // ---------------------------------------------------------------------------
+
+  /// Perfil em tempo real (null enquanto o documento não existe).
+  static Stream<Perfil?> perfilStream() {
+    final doc = _meuDoc;
+    if (doc == null) return Stream.value(null);
+    return doc.snapshots().map((s) {
+      final dados = s.data();
+      return dados == null ? null : Perfil.fromMap(dados);
+    });
+  }
+
+  /// Troca o nome (Firestore e Auth). Posts antigos mantêm o nome antigo.
+  static Future<void> atualizarNome(String nome) async {
+    final doc = _meuDoc;
+    final limpo = nome.trim();
+    if (doc == null || limpo.length < 3) return;
+    await doc.set({'name': limpo}, SetOptions(merge: true));
+    await AuthService.currentUser?.updateDisplayName(limpo);
   }
 
   // ---------------------------------------------------------------------------
@@ -81,6 +140,17 @@ class UserService {
         'geohash': PostModel.calcularGeohash(lat, lng),
         'updatedAt': FieldValue.serverTimestamp(),
       },
+    }, SetOptions(merge: true));
+  }
+
+  /// Desligar os alertas apaga a localização e o token (minimização de dados).
+  static Future<void> desligarAlertas() async {
+    final doc = _meuDoc;
+    if (doc == null) return;
+    await doc.set({
+      'alertsEnabled': false,
+      'lastLocation': FieldValue.delete(),
+      'fcmToken': FieldValue.delete(),
     }, SetOptions(merge: true));
   }
 

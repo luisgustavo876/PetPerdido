@@ -17,8 +17,8 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
 | 3 | Geofencing + Push | ✅ Código pronto · ⏸️ deploy da Function espera sua autorização |
 | 4 | 7 Pontos e recompensas | ✅ Feito |
 | 5 | 8 Chat | ✅ Feito (falta você criar a política TTL) |
-| 6 | 9 Configurações, perfil e LGPD | ⏳ Em andamento |
-| 7 | Fechamento | Pendente |
+| 6 | 9 Configurações, perfil e LGPD | ✅ Feito |
+| 7 | Fechamento | ⏳ Em andamento |
 
 ## Feito
 
@@ -61,6 +61,11 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
   `chats/{chatId}/`, até 5 MB); filtro de palavrões (ao enviar e ao exibir); mensagens com mais de
   15 dias escondidas e com `expireAt` para o TTL; só o nome do outro aparece. `DadosGlobais` foi
   apagado. Regras do Firestore e do Storage validadas por REST com 3 usuários (35/35).
+- **Módulo 9** — Configurações com dados reais (nome editável, e-mail, CPF mascarado `***.456.789-**`,
+  pontos), alterar senha (e-mail de redefinição), alertas (ligar/desligar e raio 1/3/5/10 km), "Meus
+  posts" (resolver/excluir) e "Favoritos", Termos de Uso e Política de Privacidade (também linkados
+  no cadastro), sair e "Excluir minha conta" com reautenticação. Sequência de exclusão validada por
+  REST (33/33) e conferida com o MCP do Firebase (nenhum dado de teste sobrou em `chats`).
 
 ## Decisões de implementação
 
@@ -140,6 +145,17 @@ Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
   política TTL apagar do banco. (O INSTRUCTIONS fala em "15 dias de inatividade"; segui o roteiro:
   15 dias por mensagem.)
 - O banner do chat orienta a combinar a entrega em local público e a não enviar endereço/CPF.
+- **Excluir conta — ordem:** reautentica com a senha → apaga posts do usuário (com avistamentos e
+  fotos) → avistamentos feitos em posts de outros (achados pelo histórico de pontos `euvi_<postId>`,
+  sem consulta de grupo de coleções, que exigiria índice) → mensagens próprias (e fotos) e as
+  conversas → `notifications`, `pointsLog`, `redemptions` → `users/{uid}` → usuário do Auth.
+  As mensagens da outra pessoa ficam inacessíveis sem o documento da conversa e o TTL as apaga.
+- **Desligar alertas** apaga `lastLocation` e `fcmToken` (minimização de dados, LGPD). Ligar de novo
+  pede as permissões e grava de novo.
+- **Trocar o nome** atualiza `users/{uid}` e o Auth; posts e conversas antigos guardam o nome da época
+  (cópia no documento, comum em Firestore).
+- Termos e Política: textos de protótipo, em linguagem simples, sem contato pessoal; devem ser
+  revisados antes de um uso real. O alerta, a Web e o raio aparecem desabilitados na Web (sem push).
 
 ## Passos manuais pendentes (dependem de você)
 
