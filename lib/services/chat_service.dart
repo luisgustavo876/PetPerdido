@@ -3,6 +3,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/app_constants.dart';
 import '../core/filtro_palavroes.dart';
+import '../core/formatters.dart';
 import '../models/chat_model.dart';
 import '../models/post_model.dart';
 import 'auth_service.dart';
@@ -48,9 +49,10 @@ class ChatService {
     final participantes = [eu, post.userId]..sort(); // mesma ordem do id
     final dados = {
       'participants': participantes,
+      // Nunca copia e-mail: posts antigos gravaram o e-mail em userName.
       'participantNames': {
         eu: AuthService.currentUserName,
-        post.userId: post.userName,
+        post.userId: Formatters.nomeUsuario(post.userName),
       },
       'postId': post.id,
       'postTitle': tituloDoPost(post),

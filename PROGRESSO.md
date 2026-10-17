@@ -9,8 +9,7 @@ Branch: `refactor/modulo-0-limpeza` (enviada ao GitHub, sem merge). Prazo: 28/10
 
 **Todo o código das 7 fases está pronto e commitado.** `flutter analyze` sem avisos, 166 testes
 Flutter + 9 testes da Cloud Function passando, `flutter build apk --debug` compilando. Regras do
-Firestore e do Storage publicadas e validadas por REST — exceto a regra nova de avistamento (pacote
-de correções), validada no emulador e aguardando a sua autorização para publicar.
+Firestore e do Storage publicadas e validadas por REST (inclusive a de avistamento não vazio).
 
 | Fase | Módulo | Situação |
 |---|---|---|
@@ -28,8 +27,8 @@ de correções), validada no emulador e aguardando a sua autorização para publ
 1. ~~Deploy da Cloud Function~~ — **feito em 16/10/2026** e testado ponta a ponta (22/22): só o usuário
    a ~0,6 km recebeu o alerta; o de ~12 km e o autor não. Falta só decidir a política de limpeza
    do Artifact Registry (item 1 dos passos manuais).
-2. **Publicar as regras do Firestore do pacote de correções** (avistamento não pode ser vazio;
-   validadas no emulador local, ainda NÃO publicadas): `firebase deploy --only firestore:rules`.
+2. ~~Publicar a regra de avistamento não vazio~~ — **publicada em 16/10/2026** (ruleset ativo igual
+   ao `firestore.rules`; validada no projeto real 5/5, dados de teste apagados).
 3. Os passos manuais abaixo (console do Firebase/Google e Git).
 4. Seu teste no celular Android (roteiro no fim).
 
@@ -94,9 +93,12 @@ de correções), validada no emulador e aguardando a sua autorização para publ
   3. Data de nascimento digitada (`29062006` → `29/06/2006`) com calendário opcional; valida data
      real, futuro e 16 anos, com mensagens claras.
   4. Usuário sempre pelo nome (`Formatters.nomeUsuario`): sem nome ou com "@" vira "Usuário". O
-     cartão do perfil não mostra mais o e-mail.
+     cartão do perfil não mostra mais o e-mail. O chat também não copia mais o `userName` do post
+     sem filtrar. **Dados corrigidos (16/10):** 2 posts (`userName`) e 1 chat
+     (`participantNames`) guardavam o e-mail de uma conta sem nome no perfil; viraram "Usuário".
+     Varredura de posts, sightings, chats, messages e notifications: 0 e-mails.
   5. "Eu vi" exige bairro e descrição (mín. 10 caracteres), botão desabilitado e aviso do que falta;
-     regra equivalente em `sightings` (validada no emulador 14/14, **não publicada**).
+     regra equivalente em `sightings` (emulador 14/14; publicada e conferida no projeto real 5/5).
   6. Fotos sem corte: inteira na criação, inteira sobre fundo desfocado no card, proporção original
      e zoom em tela cheia no detalhe; upload até 1600 px / qualidade 85, mantendo a proporção.
   7. 22 características prontas (agrupadas) + até 5 próprias ("+ Adicionar", 2 a 24 caracteres, sem
