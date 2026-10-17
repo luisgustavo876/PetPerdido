@@ -124,6 +124,8 @@ class AuthService {
     await _auth.signOut();
   }
 
+  /// Nome do usuário logado para gravar em posts, avistamentos e chats
+  /// (dados públicos). Sem nome, usa "Usuário" — nunca o e-mail.
   static String get currentUserName =>
-      currentUser?.displayName ?? currentUser?.email ?? 'Usuário';
+      Formatters.nomeUsuario(currentUser?.displayName);
 }

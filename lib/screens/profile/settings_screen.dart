@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../core/app_constants.dart';
+import '../../core/formatters.dart';
 import '../../services/alerta_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/conta_service.dart';
@@ -64,6 +65,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (novo == null) return;
     if (novo.trim().length < 3) {
       _aviso('O nome precisa ter pelo menos 3 letras.');
+      return;
+    }
+    if (novo.contains('@')) {
+      _aviso('Use o seu nome, não o e-mail (ele aparece para outras pessoas).');
       return;
     }
     try {
@@ -247,7 +252,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Cartão do perfil: nome, CPF mascarado e pontos (sem e-mail).
   Widget _cartaoPerfil(Perfil p) {
+    final nome = Formatters.nomeUsuario(p.nome);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -261,7 +268,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             radius: 32,
             backgroundColor: AppColors.primarySurface,
             child: Text(
-              p.nome.isNotEmpty ? p.nome[0].toUpperCase() : '?',
+              nome[0].toUpperCase(),
               style: const TextStyle(
                   fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.primary),
             ),
@@ -271,11 +278,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(p.nome,
+                Text(nome,
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 4),
-                Text(p.email,
-                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                 Text('CPF ${Perfil.mascararCpf(p.cpf)}',
                     style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                 const SizedBox(height: 8),

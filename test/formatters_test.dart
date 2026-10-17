@@ -11,6 +11,18 @@ void main() {
     });
   });
 
+  group('nomeUsuario (nunca mostra e-mail)', () {
+    test('usa o nome quando existe', () {
+      expect(Formatters.nomeUsuario(' Ana Souza '), 'Ana Souza');
+    });
+
+    test('vazio, nulo ou e-mail viram "Usuário"', () {
+      expect(Formatters.nomeUsuario(null), 'Usuário');
+      expect(Formatters.nomeUsuario('  '), 'Usuário');
+      expect(Formatters.nomeUsuario('ana@exemplo.com'), 'Usuário');
+    });
+  });
+
   group('data e lerData (DD/MM/AAAA)', () {
     test('formata no padrão brasileiro', () {
       expect(Formatters.data(DateTime(2006, 6, 9)), '09/06/2006');

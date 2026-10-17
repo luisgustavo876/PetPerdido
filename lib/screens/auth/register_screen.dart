@@ -168,8 +168,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _nameController,
                   prefixIcon: Icons.person_outline,
                   textCapitalization: TextCapitalization.words,
-                  validator: (v) =>
-                      (v == null || v.trim().length < 3) ? 'Nome inválido' : null,
+                  validator: (v) {
+                    if (v == null || v.trim().length < 3) return 'Nome inválido';
+                    // O nome aparece nos posts: não pode ser o e-mail.
+                    if (v.contains('@')) return 'Use o seu nome, não o e-mail';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 14),
                 CustomTextField(

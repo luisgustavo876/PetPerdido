@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/formatters.dart';
 
 /// Conversa entre duas pessoas sobre um post (chats/{chatId}).
 ///
@@ -36,7 +37,8 @@ class ChatModel {
   String outro(String meuUid) =>
       participants.firstWhere((p) => p != meuUid, orElse: () => meuUid);
 
-  String nomeDoOutro(String meuUid) => participantNames[outro(meuUid)] ?? 'Usuário';
+  String nomeDoOutro(String meuUid) =>
+      Formatters.nomeUsuario(participantNames[outro(meuUid)]);
 
   int naoLidas(String meuUid) => unread[meuUid] ?? 0;
 

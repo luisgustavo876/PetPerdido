@@ -30,6 +30,14 @@ class Formatters {
     return 'em ${dois(data.day)}/${dois(data.month)}/${data.year}';
   }
 
+  /// Nome para exibir o usuário em qualquer tela. Nunca mostra e-mail:
+  /// nome vazio ou com "@" (posts antigos gravaram o e-mail) vira "Usuário".
+  static String nomeUsuario(String? nome) {
+    final n = nome?.trim() ?? '';
+    if (n.isEmpty || n.contains('@')) return 'Usuário';
+    return n;
+  }
+
   /// "29/06/2006" (padrão brasileiro).
   static String data(DateTime d) {
     String dois(int n) => n.toString().padLeft(2, '0');

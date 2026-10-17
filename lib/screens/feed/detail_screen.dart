@@ -486,8 +486,8 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Widget _autor() {
-    final inicial =
-        _post.userName.isNotEmpty ? _post.userName[0].toUpperCase() : '?';
+    final nome = Formatters.nomeUsuario(_post.userName);
+    final inicial = nome[0].toUpperCase();
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -511,7 +511,7 @@ class _DetailScreenState extends State<DetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_souAutor ? '${_post.userName} (você)' : _post.userName,
+                Text(_souAutor ? '$nome (você)' : nome,
                     style: const TextStyle(
                         fontSize: 14, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
@@ -559,7 +559,8 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Widget _itemLinhaDoTempo(SightingModel s, {required bool ultimo}) {
-    final quem = s.userId == _meuUid ? 'Você' : s.userName;
+    final quem =
+        s.userId == _meuUid ? 'Você' : Formatters.nomeUsuario(s.userName);
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,

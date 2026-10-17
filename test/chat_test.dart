@@ -61,6 +61,14 @@ void main() {
       expect(c.participants, isEmpty);
       expect(c.nomeDoOutro('a'), 'Usuário');
     });
+
+    test('nome gravado como e-mail (dado antigo) não aparece', () {
+      final c = ChatModel.fromMap('p1_a_b', {
+        'participants': ['a', 'b'],
+        'participantNames': {'a': 'Ana', 'b': 'bruno@exemplo.com'},
+      });
+      expect(c.nomeDoOutro('a'), 'Usuário');
+    });
   });
 
   group('ChatService', () {
