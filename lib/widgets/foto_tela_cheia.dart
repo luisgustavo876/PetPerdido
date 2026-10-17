@@ -26,7 +26,7 @@ class FotoTelaCheia extends StatelessWidget {
         foregroundColor: Colors.white,
         leading: IconButton(
           tooltip: 'Fechar',
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
       ),

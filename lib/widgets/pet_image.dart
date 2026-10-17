@@ -120,6 +120,9 @@ class PetImage extends StatelessWidget {
 
 /// Foto inteira (BoxFit.contain) sobre uma cópia desfocada e ampliada dela
 /// mesma: preenche um espaço de altura fixa sem recortar a foto.
+///
+/// Na Web o fundo é neutro: quando o bucket não libera CORS, a foto vira um
+/// elemento <img> e o desfoque não se aplica (a cópia apareceria nítida).
 class ImagemSemCorte extends StatelessWidget {
   /// Monta a imagem com o [BoxFit] pedido; [fundo] indica a cópia desfocada.
   final Widget Function(BoxFit fit, {required bool fundo}) imagem;
@@ -128,6 +131,12 @@ class ImagemSemCorte extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return ColoredBox(
+        color: AppColors.background,
+        child: imagem(BoxFit.contain, fundo: false),
+      );
+    }
     return Stack(
       fit: StackFit.expand,
       children: [
