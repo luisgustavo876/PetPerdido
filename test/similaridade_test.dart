@@ -28,6 +28,15 @@ void main() {
           Similaridade.similaridade(achado, perdido));
     });
 
+    test('características próprias/desconhecidas não mudam o cálculo', () {
+      final comProprias = postDeTeste(
+          id: 'a2',
+          type: PostType.found,
+          traits: ['Mancha branca no peito', '???', '', 'Com coleira']);
+      expect(Similaridade.similaridade(perdido, comProprias),
+          Similaridade.similaridade(perdido, achado));
+    });
+
     test('mesmo tipo: não', () {
       expect(Similaridade.similaridade(perdido, postDeTeste(id: 'x')), 0);
     });

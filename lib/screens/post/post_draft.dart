@@ -2,6 +2,8 @@ import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/app_constants.dart';
+import '../../core/filtro_palavroes.dart';
+import '../../core/formatters.dart';
 import '../../models/post_model.dart';
 import '../../models/sugestao_ia.dart';
 import '../../services/location_service.dart';
@@ -33,7 +35,8 @@ class PostDraft {
   String breed = PetOptions.racaPadrao;
   String size = 'Médio';
   String sex = 'Macho';
-  final Set<String> traits = {'Sem Coleira'};
+  /// Pré-definidas e próprias, na mesma lista (é o que vai para o post).
+  final Set<String> traits = {'Sem coleira'};
 
   // Etapa 4 — Onde e quando
   final addressController = TextEditingController();
@@ -78,6 +81,45 @@ class PostDraft {
       traits.addAll(s.caracteristicas);
       sugeridosPelaIA.add('caracteristicas');
     }
+  }
+
+  /// Características que o usuário digitou (fora da lista pronta).
+  List<String> get caracteristicasProprias => [
+        for (final t in traits)
+          if (!PetOptions.caracteristicas.contains(t)) t,
+      ];
+
+  /// Valida e adiciona uma característica digitada pelo usuário.
+  /// Retorna a mensagem de erro, ou null se deu certo. Se o texto for uma
+  /// das pré-definidas (ex.: "olhos AZUIS"), só marca a pré-definida.
+  String? adicionarCaracteristica(String texto) {
+    final t = texto.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (t.length < PetOptions.minTamanhoCaracteristica) {
+      return 'Use pelo menos ${PetOptions.minTamanhoCaracteristica} letras.';
+    }
+    if (t.length > PetOptions.maxTamanhoCaracteristica) {
+      return 'Use no máximo ${PetOptions.maxTamanhoCaracteristica} caracteres.';
+    }
+    if (FiltroPalavroes.contemPalavrao(t)) {
+      return 'Essa característica tem palavras não permitidas.';
+    }
+
+    final chave = Formatters.normalizar(t);
+    bool igual(String outra) => Formatters.normalizar(outra) == chave;
+
+    if (traits.any(igual)) return 'Essa característica já está na lista.';
+    final pronta = PetOptions.caracteristicas.where(igual).firstOrNull;
+    if (pronta != null) {
+      traits.add(pronta);
+      return null;
+    }
+    if (caracteristicasProprias.length >=
+        PetOptions.maxCaracteristicasProprias) {
+      return 'Você pode adicionar até '
+          '${PetOptions.maxCaracteristicasProprias} características próprias.';
+    }
+    traits.add(t[0].toUpperCase() + t.substring(1));
+    return null;
   }
 
   /// Título da etapa 4, conforme o tipo do post.

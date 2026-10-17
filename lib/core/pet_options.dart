@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Opções fixas sobre o pet (espécie, cor, raça, porte...), usadas no\n/// formulário de criar post e nos filtros.
+/// Opções fixas sobre o pet (espécie, cor, raça, porte...), usadas no
+/// formulário de criar post e nos filtros.
 class PetOptions {
   PetOptions._();
 
@@ -64,16 +65,36 @@ class PetOptions {
 
   static const sexos = ['Macho', 'Fêmea'];
 
-  static const caracteristicas = [
-    'Dócil',
-    'Assustado',
-    'Com Coleira',
-    'Sem Coleira',
-    'Castrado',
-    'Ferido',
-    'Brincalhão',
-    'Olhos Azuis',
-  ];
+  /// Características pré-definidas, agrupadas para a tela de criar post.
+  static const gruposCaracteristicas = <String, List<String>>{
+    'Comportamento': ['Dócil', 'Assustado', 'Agressivo', 'Brincalhão'],
+    'Identificação': [
+      'Com coleira',
+      'Sem coleira',
+      'Com plaquinha de identificação',
+      'Microchip',
+      'Usando roupinha',
+    ],
+    'Saúde': ['Castrado', 'Vacinado', 'Ferido', 'Mancando'],
+    'Idade e corpo': ['Filhote', 'Idoso', 'Magro'],
+    'Aparência': [
+      'Pelo longo',
+      'Pelo curto',
+      'Manchas',
+      'Olhos azuis',
+      'Orelhas caídas',
+      'Cauda curta',
+    ],
+  };
+
+  /// Todas as pré-definidas, numa lista só (também é o "enum" da IA).
+  static final List<String> caracteristicas = List.unmodifiable(
+      [for (final grupo in gruposCaracteristicas.values) ...grupo]);
+
+  // Características próprias (o usuário digita): limites.
+  static const maxCaracteristicasProprias = 5;
+  static const minTamanhoCaracteristica = 2;
+  static const maxTamanhoCaracteristica = 24;
 
   /// Texto genérico que não serve como endereço do post.
   static const enderecoGenerico = 'Localização atual';

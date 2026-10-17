@@ -66,7 +66,7 @@ class StepPet extends StatelessWidget {
         _sexos(),
         const SizedBox(height: 24),
         RotuloSecao('Características', complemento: _selo('caracteristicas')),
-        _caracteristicas(),
+        _caracteristicas(context),
         const SizedBox(height: 24),
         const RotuloSecao('Descrição'),
         _descricao(),
@@ -304,35 +304,138 @@ class StepPet extends StatelessWidget {
     );
   }
 
-  Widget _caracteristicas() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+  /// Características pré-definidas por grupo e, no fim, as próprias do
+  /// usuário (selecionadas e removíveis) com o chip "+ Adicionar".
+  Widget _caracteristicas(BuildContext context) {
+    final proprias = draft.caracteristicasProprias;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final item in PetOptions.caracteristicas)
-          FilterChip(
-            label: Text(item),
-            selected: draft.traits.contains(item),
-            showCheckmark: false,
-            selectedColor: AppColors.primarySurface,
-            side: BorderSide(
-              color: draft.traits.contains(item)
-                  ? AppColors.primary
-                  : AppColors.divider,
-            ),
-            labelStyle: TextStyle(
-              fontSize: 12,
-              color: draft.traits.contains(item)
-                  ? AppColors.primary
-                  : AppColors.onSurface,
-            ),
-            onSelected: (marcado) {
-              marcado ? draft.traits.add(item) : draft.traits.remove(item);
-              _editou('caracteristicas');
-            },
+        for (final MapEntry(key: grupo, value: itens)
+            in PetOptions.gruposCaracteristicas.entries) ...[
+          Text(grupo,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [for (final item in itens) _chipCaracteristica(item)],
           ),
+          const SizedBox(height: 16),
+        ],
+        const Text('Outras',
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final item in proprias)
+              InputChip(
+                label: Text(item),
+                selected: true,
+                showCheckmark: false,
+                selectedColor: AppColors.primarySurface,
+                side: const BorderSide(color: AppColors.primary),
+                labelStyle:
+                    const TextStyle(fontSize: 12, color: AppColors.primary),
+                deleteIcon: const Icon(Icons.close, size: 16),
+                deleteIconColor: AppColors.primary,
+                deleteButtonTooltipMessage: 'Remover',
+                onDeleted: () {
+                  draft.traits.remove(item);
+                  _editou('caracteristicas');
+                },
+              ),
+            if (proprias.length < PetOptions.maxCaracteristicasProprias)
+              ActionChip(
+                avatar: const Icon(Icons.add, size: 16, color: AppColors.primary),
+                label: const Text('Adicionar'),
+                labelStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary),
+                side: const BorderSide(color: AppColors.divider),
+                onPressed: () => _adicionarCaracteristica(context),
+              ),
+          ],
+        ),
       ],
     );
+  }
+
+  Widget _chipCaracteristica(String item) {
+    final marcado = draft.traits.contains(item);
+    return FilterChip(
+      label: Text(item),
+      selected: marcado,
+      showCheckmark: false,
+      selectedColor: AppColors.primarySurface,
+      side: BorderSide(color: marcado ? AppColors.primary : AppColors.divider),
+      labelStyle: TextStyle(
+        fontSize: 12,
+        color: marcado ? AppColors.primary : AppColors.onSurface,
+      ),
+      onSelected: (sim) {
+        sim ? draft.traits.add(item) : draft.traits.remove(item);
+        _editou('caracteristicas');
+      },
+    );
+  }
+
+  /// Caixa para digitar uma característica própria (2 a 24 caracteres, sem
+  /// repetir e sem palavrões). Fica aberta mostrando o erro até dar certo.
+  Future<void> _adicionarCaracteristica(BuildContext context) async {
+    final controller = TextEditingController();
+    String? erro;
+    final adicionou = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateDialogo) {
+          void salvar() {
+            final msg = draft.adicionarCaracteristica(controller.text);
+            if (msg == null) {
+              Navigator.pop(ctx, true);
+            } else {
+              setStateDialogo(() => erro = msg);
+            }
+          }
+
+          return AlertDialog(
+            title: const Text('Nova característica'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: PetOptions.maxTamanhoCaracteristica,
+              textCapitalization: TextCapitalization.sentences,
+              onChanged: (_) {
+                if (erro != null) setStateDialogo(() => erro = null);
+              },
+              onSubmitted: (_) => salvar(),
+              decoration: InputDecoration(
+                hintText: 'Ex.: Mancha branca no peito',
+                errorText: erro,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(onPressed: salvar, child: const Text('Adicionar')),
+            ],
+          );
+        },
+      ),
+    );
+    controller.dispose();
+    if (adicionou == true) _editou('caracteristicas');
   }
 
   Widget _descricao() {

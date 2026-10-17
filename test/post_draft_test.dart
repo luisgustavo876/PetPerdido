@@ -129,4 +129,53 @@ void main() {
       expect(p.petName, 'Sem nome');
     });
   });
+
+  group('características próprias', () {
+    test('adiciona com a 1ª letra maiúscula e vai para o post', () {
+      final d = rascunhoValido();
+      expect(d.adicionarCaracteristica('  mancha   branca no peito '), isNull);
+      expect(d.caracteristicasProprias, ['Mancha branca no peito']);
+      final p = d.toPostModel(id: 'x', userId: 'u', userName: 'n', agora: agora);
+      expect(p.traits, contains('Mancha branca no peito'));
+    });
+
+    test('tamanho: de 2 a 24 caracteres', () {
+      final d = PostDraft();
+      expect(d.adicionarCaracteristica('a'), contains('pelo menos 2'));
+      expect(d.adicionarCaracteristica('a' * 25), contains('no máximo 24'));
+      expect(d.adicionarCaracteristica('ab'), isNull);
+      expect(d.adicionarCaracteristica('b' * 24), isNull);
+    });
+
+    test('não duplica (sem diferenciar maiúsculas e acentos)', () {
+      final d = PostDraft();
+      expect(d.adicionarCaracteristica('Rabo torto'), isNull);
+      expect(d.adicionarCaracteristica('RABO TÓRTO'), contains('já está'));
+      // Já marcada por padrão:
+      expect(d.adicionarCaracteristica('sem COLEIRA'), contains('já está'));
+    });
+
+    test('texto igual a uma pré-definida só marca a pré-definida', () {
+      final d = PostDraft();
+      expect(d.adicionarCaracteristica('olhos azuis'), isNull);
+      expect(d.traits, contains('Olhos azuis'));
+      expect(d.caracteristicasProprias, isEmpty);
+    });
+
+    test('no máximo ${PetOptions.maxCaracteristicasProprias} próprias', () {
+      final d = PostDraft();
+      for (var i = 1; i <= PetOptions.maxCaracteristicasProprias; i++) {
+        expect(d.adicionarCaracteristica('Marca $i'), isNull);
+      }
+      expect(d.adicionarCaracteristica('Marca extra'), contains('até 5'));
+      // Pré-definidas continuam liberadas.
+      expect(d.adicionarCaracteristica('Microchip'), isNull);
+    });
+
+    test('recusa palavrão (mesmo filtro do chat)', () {
+      final d = PostDraft();
+      expect(d.adicionarCaracteristica('cão porra'), contains('não permitidas'));
+      expect(d.caracteristicasProprias, isEmpty);
+    });
+  });
 }

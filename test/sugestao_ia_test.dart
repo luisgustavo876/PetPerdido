@@ -13,12 +13,12 @@ void main() {
     test('resposta completa dentro das listas', () {
       final s = SugestaoIA.converter('''
         {"species": "Cão", "size": "Médio", "colors": ["Caramelo", "Branco"],
-         "breed": "Vira-lata caramelo", "traits": ["Com Coleira", "Dócil"]}''')!;
+         "breed": "Vira-lata caramelo", "traits": ["Com coleira", "Dócil"]}''')!;
       expect(s.especie, 'Cão');
       expect(s.porte, 'Médio');
       expect(s.cores, ['Caramelo', 'Branco']);
       expect(s.raca, 'Vira-lata caramelo');
-      expect(s.caracteristicas, ['Com Coleira', 'Dócil']);
+      expect(s.caracteristicas, ['Com coleira', 'Dócil']);
       expect(s.naoEhPet, isFalse);
     });
 
@@ -96,13 +96,13 @@ void main() {
         porte: 'Pequeno',
         cores: ['Preto', 'Branco'],
         raca: 'Siamês',
-        caracteristicas: ['Olhos Azuis'],
+        caracteristicas: ['Olhos azuis'],
       ));
       expect(d.species, 'Gato');
       expect(d.size, 'Pequeno');
       expect(d.colors, {'Preto', 'Branco'});
       expect(d.breed, 'Siamês');
-      expect(d.traits, contains('Olhos Azuis'));
+      expect(d.traits, contains('Olhos azuis'));
       expect(d.sugeridosPelaIA,
           {'especie', 'porte', 'cores', 'raca', 'caracteristicas'});
       d.dispose();
