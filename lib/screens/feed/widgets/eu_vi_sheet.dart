@@ -119,13 +119,20 @@ class _EuViSheetState extends State<EuViSheet> {
     }
   }
 
+  /// O que ainda falta preencher (null = pode registrar).
+  String? get _falta => SightingModel.oQueFalta(
+        bairro: _bairroController.text,
+        descricao: _notasController.text,
+        bairroGenerico: PetOptions.enderecoGenerico,
+      );
+
   Future<void> _registrar() async {
-    final bairro = _bairroController.text.trim();
-    if (bairro.isEmpty ||
-        bairro.toLowerCase() == PetOptions.enderecoGenerico.toLowerCase()) {
-      setState(() => _erro = _msgSemBairro);
+    final falta = _falta;
+    if (falta != null) {
+      setState(() => _erro = falta);
       return;
     }
+    final bairro = _bairroController.text.trim();
     final user = AuthService.currentUser;
     if (user == null) {
       setState(() => _erro = 'Entre na sua conta para registrar.');
@@ -182,6 +189,7 @@ class _EuViSheetState extends State<EuViSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final falta = _falta;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SafeArea(
@@ -241,15 +249,18 @@ class _EuViSheetState extends State<EuViSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Observações (opcional)',
+              const Text('O que você viu?',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               TextField(
                 controller: _notasController,
+                onChanged: (_) => setState(() => _erro = null),
                 maxLines: 3,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Ex.: estava assustado e correu para a praça.',
+                  helperText:
+                      'Obrigatório, mínimo de ${SightingModel.minDescricao} caracteres.',
                 ),
               ),
               const SizedBox(height: 16),
@@ -274,8 +285,9 @@ class _EuViSheetState extends State<EuViSheet> {
                 ),
               ],
               const SizedBox(height: 24),
+              // Desabilitado enquanto faltar bairro ou descrição.
               ElevatedButton(
-                onPressed: _enviando ? null : _registrar,
+                onPressed: _enviando || falta != null ? null : _registrar,
                 child: _enviando
                     ? const SizedBox(
                         width: 20,
@@ -285,6 +297,15 @@ class _EuViSheetState extends State<EuViSheet> {
                       )
                     : const Text('Registrar avistamento'),
               ),
+              if (falta != null && !_localizando) ...[
+                const SizedBox(height: 8),
+                Text(
+                  falta,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
             ],
           ),
         ),

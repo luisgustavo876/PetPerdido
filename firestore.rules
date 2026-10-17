@@ -33,10 +33,19 @@ service cloud.firestore {
       }
 
       // Avistamentos: o id do documento é o uid de quem viu (1 por pessoa).
+      // Não pode ser vazio: bairro e descrição (mín. 10 caracteres, o mesmo
+      // valor de SightingModel.minDescricao) são obrigatórios.
       match /sightings/{uid} {
+        function avistamentoPreenchido() {
+          let d = request.resource.data;
+          return d.notes is string && d.notes.trim().size() >= 10
+            && d.address is string && d.address.trim().size() >= 2;
+        }
+
         allow read: if true;
         allow create: if logado() && uid == request.auth.uid
-          && request.resource.data.userId == request.auth.uid;
+          && request.resource.data.userId == request.auth.uid
+          && avistamentoPreenchido();
         // Quem registrou ou o autor do post (ao excluir o post).
         allow delete: if logado() && (
           resource.data.userId == request.auth.uid

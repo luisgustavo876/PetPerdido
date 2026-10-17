@@ -40,4 +40,32 @@ void main() {
     final map = avistamento.toMap()..['createdAt'] = null;
     expect(SightingModel.fromMap(map).createdAt, isA<DateTime>());
   });
+
+  group('oQueFalta (avistamento não pode ser vazio)', () {
+    String? falta(String bairro, String descricao) => SightingModel.oQueFalta(
+        bairro: bairro,
+        descricao: descricao,
+        bairroGenerico: 'Localização atual');
+
+    test('completo: nada falta', () {
+      expect(falta('Centro', 'Vi perto da praça'), isNull);
+      expect(falta('Centro', '1234567890'), isNull); // mínimo exato
+    });
+
+    test('tudo vazio: pede os dois', () {
+      final msg = falta('', '')!;
+      expect(msg, contains('bairro'));
+      expect(msg, contains('${SightingModel.minDescricao} caracteres'));
+    });
+
+    test('descrição curta diz quantos caracteres faltam', () {
+      expect(falta('Centro', '123456789'), contains('mais 1 caractere'));
+      expect(falta('Centro', '  abc  '), contains('mais 7 caracteres'));
+    });
+
+    test('bairro vazio ou genérico não vale', () {
+      expect(falta('  ', 'Vi perto da praça'), contains('bairro'));
+      expect(falta('Localização atual', 'Vi perto da praça'), contains('bairro'));
+    });
+  });
 }
