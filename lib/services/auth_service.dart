@@ -40,7 +40,9 @@ class AuthService {
         'id': user.uid,
         'name': name.trim(),
         'email': email.trim(),
-        'cpf': cpf, // Protegido pelas regras: só o próprio usuário lê
+        // Só os 11 dígitos, sem máscara. Protegido pelas regras: só o
+        // próprio usuário lê.
+        'cpf': cpf.replaceAll(RegExp(r'\D'), ''),
         'birthDate': Timestamp.fromDate(birthDate),
         'points': AppConstants.initialPoints,
         'createdAt': FieldValue.serverTimestamp(),

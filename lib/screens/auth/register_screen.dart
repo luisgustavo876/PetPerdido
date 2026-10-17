@@ -1,10 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_colors.dart';
 import '../../core/app_constants.dart';
+import '../../core/input_formatters.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
@@ -38,6 +38,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _birthController.dispose();
     super.dispose();
   }
+
+  static String _soDigitos(String texto) => texto.replaceAll(RegExp(r'\D'), '');
 
   /// Formata a data como dd/mm/aaaa.
   String _formatarData(DateTime d) =>
@@ -74,7 +76,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         name: _nameController.text,
         email: _emailController.text,
         password: _passwordController.text,
-        cpf: _cpfController.text,
+        cpf: _soDigitos(_cpfController.text), // grava só os 11 dígitos
         birthDate: _birthDate!,
       );
       // Conta e documento users/{uid} gravados. A RegisterScreen está
@@ -190,15 +192,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _cpfController,
                   prefixIcon: Icons.badge_outlined,
                   keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(AppConstants.cpfLength),
-                  ],
+                  // Digita só números; a máscara 000.000.000-00 aparece sozinha.
+                  inputFormatters: [MascaraInputFormatter.cpf()],
                   validator: (v) {
-                    if (v == null || v.length != AppConstants.cpfLength) {
+                    final digitos = _soDigitos(v ?? '');
+                    if (digitos.length != AppConstants.cpfLength) {
                       return 'CPF deve ter ${AppConstants.cpfLength} dígitos';
                     }
-                    if (!AuthService.validarCpf(v)) return 'CPF inválido';
+                    if (!AuthService.validarCpf(digitos)) return 'CPF inválido';
                     return null;
                   },
                 ),
