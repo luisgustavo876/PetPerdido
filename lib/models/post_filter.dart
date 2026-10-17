@@ -31,7 +31,6 @@ class PostFilter {
   final String? cor;
   final PeriodoFiltro periodo;
   final bool incluirResolvidos;
-  final bool soFavoritos;
   final OrdemFeed ordem;
 
   const PostFilter({
@@ -41,7 +40,6 @@ class PostFilter {
     this.cor,
     this.periodo = PeriodoFiltro.tudo,
     this.incluirResolvidos = false,
-    this.soFavoritos = false,
     this.ordem = OrdemFeed.recentes,
   });
 
@@ -55,7 +53,6 @@ class PostFilter {
     Object? cor = _mantem,
     PeriodoFiltro? periodo,
     bool? incluirResolvidos,
-    bool? soFavoritos,
     OrdemFeed? ordem,
   }) {
     return PostFilter(
@@ -65,7 +62,6 @@ class PostFilter {
       cor: identical(cor, _mantem) ? this.cor : cor as String?,
       periodo: periodo ?? this.periodo,
       incluirResolvidos: incluirResolvidos ?? this.incluirResolvidos,
-      soFavoritos: soFavoritos ?? this.soFavoritos,
       ordem: ordem ?? this.ordem,
     );
   }
@@ -78,18 +74,15 @@ class PostFilter {
         cor != null,
         periodo != PeriodoFiltro.tudo,
         incluirResolvidos,
-        soFavoritos,
       ].where((ativo) => ativo).length;
 
   /// O post passa nos filtros? Função pura.
-  bool aceita(PostModel post,
-      {required DateTime agora, Set<String> favoritos = const {}}) {
+  bool aceita(PostModel post, {required DateTime agora}) {
     if (!incluirResolvidos && post.isResolved) return false;
     if (tipos.isNotEmpty && !tipos.contains(post.type)) return false;
     if (especie != null && post.species != especie) return false;
     if (porte != null && post.size != porte) return false;
     if (cor != null && !post.colors.contains(cor)) return false;
-    if (soFavoritos && !favoritos.contains(post.id)) return false;
     final janela = periodo.janela;
     if (janela != null && agora.difference(post.eventAt) > janela) return false;
     return true;

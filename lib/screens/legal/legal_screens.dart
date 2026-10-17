@@ -53,7 +53,7 @@ class PrivacidadeScreen extends StatelessWidget {
                 '• Localização aproximada (cerca de 100 m): do post, do avistamento e, se '
                 'você ativar os alertas, a última posição conhecida ao abrir o app.\n'
                 '• Fotos dos pets que você enviar.\n'
-                '• Mensagens do chat, favoritos, pontos e resgates.'),
+                '• Mensagens do chat, pontos e resgates.'),
         ('Para que usamos',
             '• Mostrar os posts no mapa e no feed.\n'
                 '• Avisar quem está perto quando um pet some ou é encontrado.\n'

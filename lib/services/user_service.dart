@@ -82,29 +82,6 @@ class UserService {
   }
 
   // ---------------------------------------------------------------------------
-  // Favoritos
-  // ---------------------------------------------------------------------------
-
-  /// IDs dos posts favoritados (leitura única).
-  static Future<Set<String>> favoritos() async {
-    final doc = _meuDoc;
-    if (doc == null) return {};
-    final snap = await doc.get();
-    return Set<String>.from(snap.data()?['favorites'] as List? ?? const []);
-  }
-
-  /// Favorita ou desfavorita um post (arrayUnion / arrayRemove).
-  static Future<void> definirFavorito(String postId, bool favorito) async {
-    final doc = _meuDoc;
-    if (doc == null) return;
-    await doc.set({
-      'favorites': favorito
-          ? FieldValue.arrayUnion([postId])
-          : FieldValue.arrayRemove([postId]),
-    }, SetOptions(merge: true));
-  }
-
-  // ---------------------------------------------------------------------------
   // Alertas por proximidade
   // ---------------------------------------------------------------------------
 

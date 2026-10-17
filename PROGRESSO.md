@@ -2,14 +2,15 @@
 
 > Arquivo de acompanhamento. Para continuar numa sessão nova: "leia o PROGRESSO.md e continue".
 
-Branch: `refactor/modulo-0-limpeza` (sem push, sem merge). Prazo: 28/10/2026.
-Última atualização: 16/10/2026.
+Branch: `refactor/modulo-0-limpeza` (enviada ao GitHub, sem merge). Prazo: 28/10/2026.
+Última atualização: 16/10/2026 (pacote de correções de UX e bugs).
 
 ## Estado atual (resumo)
 
-**Todo o código das 7 fases está pronto e commitado.** `flutter analyze` sem avisos, 131 testes
+**Todo o código das 7 fases está pronto e commitado.** `flutter analyze` sem avisos, 166 testes
 Flutter + 9 testes da Cloud Function passando, `flutter build apk --debug` compilando. Regras do
-Firestore e do Storage publicadas e validadas por REST.
+Firestore e do Storage publicadas e validadas por REST — exceto a regra nova de avistamento (pacote
+de correções), validada no emulador e aguardando a sua autorização para publicar.
 
 | Fase | Módulo | Situação |
 |---|---|---|
@@ -27,8 +28,10 @@ Firestore e do Storage publicadas e validadas por REST.
 1. ~~Deploy da Cloud Function~~ — **feito em 16/10/2026** e testado ponta a ponta (22/22): só o usuário
    a ~0,6 km recebeu o alerta; o de ~12 km e o autor não. Falta só decidir a política de limpeza
    do Artifact Registry (item 1 dos passos manuais).
-2. Os passos manuais abaixo (console do Firebase/Google e Git).
-3. Seu teste no celular Android (roteiro no fim).
+2. **Publicar as regras do Firestore do pacote de correções** (avistamento não pode ser vazio;
+   validadas no emulador local, ainda NÃO publicadas): `firebase deploy --only firestore:rules`.
+3. Os passos manuais abaixo (console do Firebase/Google e Git).
+4. Seu teste no celular Android (roteiro no fim).
 
 ## Feito
 
@@ -41,12 +44,12 @@ Firestore e do Storage publicadas e validadas por REST.
   num painel compartilhado (`FiltrosSheet`), camada satélite, "Minha localização" e câmera inicial
   na posição do usuário (só se ele já tiver dado permissão). Build Android corrigido.
 - **Módulo 5** — feed com stream único, busca que não perde o texto (sem acentos, várias palavras),
-  filtros (tipo, espécie, porte, cor, favoritos, resolvidos) e ordem "Mais recentes" / "Mais perto
+  filtros (tipo, espécie, porte, cor, resolvidos) e ordem "Mais recentes" / "Mais perto
   de mim"; cards com "há 2 h · a 1,2 km"; estados vazio/erro. "Possíveis correspondências" na
   revisão do criar post (`Similaridade`, função pura testada).
 - **Módulo 6** — detalhe com "Eu vi este pet" real (bairro automático, observações, foto opcional) em
-  `posts/{id}/sightings/{uid}` + contadores no mesmo batch; linha do tempo real; favoritar
-  (`users/{uid}.favorites`); compartilhar (share_plus); autor marca como resolvido e exclui
+  `posts/{id}/sightings/{uid}` + contadores no mesmo batch; linha do tempo real;
+  compartilhar (share_plus); autor marca como resolvido e exclui
   (post + avistamentos + fotos). Regras publicadas e validadas por REST (28/28, tudo limpo).
 - **Módulo IA** — "Preencher com IA" na etapa Foto (foto reduzida para 1024 px, JSON estruturado com
   `responseSchema`) e "Preencher a partir da descrição" para Avistei sem foto. Sugestões com selo
@@ -73,15 +76,33 @@ Firestore e do Storage publicadas e validadas por REST.
   `chats/{chatId}/`, até 5 MB); filtro de palavrões (ao enviar e ao exibir); mensagens com mais de
   15 dias escondidas e com `expireAt` para o TTL; só o nome do outro aparece. `DadosGlobais` foi
   apagado. Regras do Firestore e do Storage validadas por REST com 3 usuários (35/35).
-- **Módulo 9** — Configurações com dados reais (nome editável, e-mail, CPF mascarado `***.456.789-**`,
+- **Módulo 9** — Configurações com dados reais (nome editável, CPF mascarado `***.456.789-**`,
   pontos), alterar senha (e-mail de redefinição), alertas (ligar/desligar e raio 1/3/5/10 km), "Meus
-  posts" (resolver/excluir) e "Favoritos", Termos de Uso e Política de Privacidade (também linkados
+  posts" (resolver/excluir), Termos de Uso e Política de Privacidade (também linkados
   no cadastro), sair e "Excluir minha conta" com reautenticação. Sequência de exclusão validada por
   REST (33/33) e conferida com o MCP do Firebase (nenhum dado de teste sobrou em `chats`).
 
 - **Fechamento** — sem código morto (nenhum arquivo, constante ou método sem uso), regras revisadas
   (autor não pode trocar o dono do post; validado 11/11), `cors.json` restrito a leitura, README
   reescrito e `docs/SUBSIDIOS_TG.md` criado.
+
+- **Pacote de correções de UX e bugs (16/10)** — um commit por item:
+  1. Fotos na Web: o `photoUrl` estava certo; o bucket não manda CORS e o Flutter Web escondia o
+     erro. `PetImage` usa `WebHtmlElementStrategy.fallback` (desenha como `<img>` se o CORS bloquear)
+     e loga o erro em modo debug. O `cors.json` continua valendo (passo manual 5).
+  2. CPF com máscara `000.000.000-00` (`MascaraInputFormatter`, sem dependência); grava só os dígitos.
+  3. Data de nascimento digitada (`29062006` → `29/06/2006`) com calendário opcional; valida data
+     real, futuro e 16 anos, com mensagens claras.
+  4. Usuário sempre pelo nome (`Formatters.nomeUsuario`): sem nome ou com "@" vira "Usuário". O
+     cartão do perfil não mostra mais o e-mail.
+  5. "Eu vi" exige bairro e descrição (mín. 10 caracteres), botão desabilitado e aviso do que falta;
+     regra equivalente em `sightings` (validada no emulador 14/14, **não publicada**).
+  6. Fotos sem corte: inteira na criação, inteira sobre fundo desfocado no card, proporção original
+     e zoom em tela cheia no detalhe; upload até 1600 px / qualidade 85, mantendo a proporção.
+  7. 22 características prontas (agrupadas) + até 5 próprias ("+ Adicionar", 2 a 24 caracteres, sem
+     duplicar, com filtro de palavrões).
+  8. "Favoritos" removido (coração, item do perfil, filtro, serviço). Eram um array `favorites` em
+     `users/{uid}`, sem regra própria; o campo pode sobrar em documentos antigos, sem uso.
 
 ## Decisões de implementação
 
@@ -98,7 +119,6 @@ Firestore e do Storage publicadas e validadas por REST.
   mesma espécie, nenhum resolvido, até 3 km e até 7 dias entre os ocorridos; além disso, cor em comum
   ou mesmo porte (se os dois informaram cores, precisa haver ao menos uma em comum). A nota ordena
   a lista (cor 0,4 + porte 0,3 + proximidade 0,3). Mostra até 5.
-- Favoritos no feed são lidos uma vez (e de novo ao voltar do Detalhe), para manter um só stream na tela.
 - O botão "Conversar" saiu do card até o chat real existir (Fase 5).
 - O `PetPostCard` não usa mais `GoogleFonts` direto (a fonte vem do tema) — assim dá para testá-lo.
 - **Avistamentos:** o id do documento é o uid de quem viu → no máximo 1 por pessoa por post (as regras
@@ -203,7 +223,9 @@ o deploy a política estava `CREATING` e passa a `ACTIVE` em alguns minutos. Par
 `firebase firestore:indexes` (mostra `ttl: true`) ou a aba TTL do Firestore no console do Google Cloud.
 
 ### 4. Restringir a chave do Google Maps
-A chave `AIzaSyC9iSb...` está no `AndroidManifest.xml`, no `AppDelegate.swift` e no `web/index.html`.
+**Android: feito em 16/10** — o `AndroidManifest.xml` usa uma chave nova, restrita por pacote e SHA-1.
+A chave antiga `AIzaSyC9iSb...` continua no `AppDelegate.swift` e no `web/index.html` (não apague nem
+restrinja só para Android, senão o mapa da Web para). Falta fazer o mesmo para a Web (e o iOS):
 1. Abra https://console.cloud.google.com/apis/credentials?project=petperdido-ff844 e clique na chave
    do Maps.
 2. **Restrições de aplicativo:** como ela é usada em mais de uma plataforma, o mais simples é criar
@@ -215,10 +237,13 @@ A chave `AIzaSyC9iSb...` está no `AndroidManifest.xml`, no `AppDelegate.swift` 
 3. **Restrições de API:** marque só "Maps SDK for Android", "Maps SDK for iOS" e "Maps JavaScript API".
 4. Salve e teste o mapa no celular e no Chrome (pode levar alguns minutos para valer).
 
-### 5. CORS do Storage (só se as fotos não aparecerem no Chrome)
-O `cors.json` (só leitura: GET/HEAD) está no repositório. Para aplicar, abra o **Cloud Shell**
-(ícone `>_` no topo do console do Google Cloud), envie o arquivo e rode:
-`gcloud storage buckets update gs://petperdido-ff844.firebasestorage.app --cors-file=cors.json`
+### 5. CORS do Storage (recomendado)
+Confirmado em 16/10: o bucket não devolve `Access-Control-Allow-Origin`. O app já contorna isso na
+Web (desenha a foto como `<img>`), mas com o CORS aplicado as fotos carregam pelo caminho normal
+(e o fundo desfocado dos cards funciona). O `cors.json` (só leitura: GET/HEAD) está no repositório.
+No **Cloud Shell** (ícone `>_` no topo do console do Google Cloud) rode:
+`gsutil cors set cors.json gs://petperdido-ff844.firebasestorage.app`
+(o comando que cria o arquivo no Cloud Shell está no relatório da sessão de 16/10).
 
 ### 6. Limpeza de dados e do repositório
 - Apagar no console do Firebase (Firestore → `posts`) os posts antigos de teste, criados antes do
@@ -232,8 +257,10 @@ Preparação: celular com **Depuração USB** ativada, conectado ao PC → `flut
 (ou instale `build/app/outputs/flutter-apk/app-debug.apk`). Use 2 contas (a sua e uma segunda,
 no Chrome em `flutter run -d web-server --web-port 8080`).
 
-1. **Cadastro (Módulo 2):** crie uma conta com CPF inválido (`11111111111`) → "CPF inválido";
-   data de nascimento de menos de 16 anos → bloqueia; dados válidos → entra direto no app.
+1. **Cadastro (Módulo 2):** digite só números no CPF (vira `000.000.000-00`); CPF inválido
+   (`11111111111`) → "CPF inválido"; data digitada só com números (`29062006` → `29/06/2006`) ou pelo
+   ícone do calendário; `31/02/2006` → "Data inválida"; menos de 16 anos → bloqueia; dados válidos →
+   entra direto no app.
 2. **Alertas (Geofencing):** no aviso "Alertas de pets perto de você" toque em **Ativar alertas** e
    permita notificações e localização. Com a outra conta, crie um post a menos de 3 km → chega "Pet perdido perto de você"; tocar abre o post; com o app aberto
    aparece um banner; o sino mostra o alerta.
@@ -243,16 +270,16 @@ no Chrome em `flutter run -d web-server --web-port 8080`).
 4. **Mapa (Módulo 4):** marcadores por cor; toque → resumo → "Ver detalhes"; Filtros (tipo, espécie,
    período, resolvidos); botão satélite; "Minha localização".
 5. **Feed (Módulo 5):** digite na busca (não perde o texto); filtros; "Mais perto de mim" mostra
-   "a X km"; favoritos.
-6. **Detalhe (Módulo 6):** com a outra conta, "Eu vi este pet" (bairro automático, foto opcional) → a
-   linha do tempo atualiza e o botão vira "Já registrado"; favoritar; compartilhar (WhatsApp etc.);
-   como autor: "Marcar como resolvido" e "Excluir".
+   "a X km"; fotos inteiras (sem corte) nos cards.
+6. **Detalhe (Módulo 6):** toque na foto → tela cheia com zoom; com a outra conta, "Eu vi este pet"
+   (bairro automático, descrição obrigatória, foto opcional) → a linha do tempo atualiza e o botão
+   vira "Já registrado"; compartilhar (WhatsApp etc.); como autor: "Marcar como resolvido" e "Excluir".
 7. **Pontos (Módulo 7):** depois de um "Achei" (+30) e de um "Eu vi" (+15), a aba Pontos mostra o
    saldo e o histórico; resgate uma recompensa → código do voucher em "Meus resgates".
 8. **Chat (Módulo 8):** no post da outra conta, "Entrar em contato" → mande texto (teste um palavrão:
    vira `***`) e uma foto; a outra conta vê a conversa com "não lidas".
 9. **Configurações (Módulo 9):** ícone de pessoa → nome, CPF mascarado, pontos; editar nome; alertas
-   (desligar/ligar, raio); Meus posts; Favoritos; Termos e Privacidade; **Excluir minha conta** com
+   (desligar/ligar, raio); Meus posts; Termos e Privacidade; **Excluir minha conta** com
    uma conta de teste (pede a senha; tudo some).
 
 ## Como rodar as verificações

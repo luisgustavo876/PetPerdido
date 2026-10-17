@@ -3,16 +3,12 @@ import '../../core/app_colors.dart';
 import '../../models/post_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/post_service.dart';
-import '../../services/user_service.dart';
 import '../../widgets/pet_post_card.dart';
 import '../feed/detail_screen.dart';
 
-/// "Meus posts" (com marcar como resolvido e excluir) ou "Favoritos".
+/// "Meus posts", com marcar como resolvido e excluir.
 class MeusPostsScreen extends StatefulWidget {
-  /// true = Favoritos; false = Meus posts.
-  final bool favoritos;
-
-  const MeusPostsScreen({super.key, this.favoritos = false});
+  const MeusPostsScreen({super.key});
 
   @override
   State<MeusPostsScreen> createState() => _MeusPostsScreenState();
@@ -28,19 +24,8 @@ class _MeusPostsScreenState extends State<MeusPostsScreen> {
   }
 
   void _carregar() {
-    _posts = widget.favoritos ? _buscarFavoritos() : _buscarMeus();
-  }
-
-  Future<List<PostModel>> _buscarMeus() {
     final uid = AuthService.currentUser?.uid;
-    return uid == null ? Future.value(const []) : PostService.postsDoAutor(uid);
-  }
-
-  Future<List<PostModel>> _buscarFavoritos() async {
-    final ids = await UserService.favoritos();
-    final posts = await Future.wait(ids.map(PostService.buscarPost));
-    return posts.whereType<PostModel>().toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    _posts = uid == null ? Future.value(const []) : PostService.postsDoAutor(uid);
   }
 
   void _recarregar() => setState(_carregar);
@@ -95,14 +80,11 @@ class _MeusPostsScreenState extends State<MeusPostsScreen> {
     await _executar(() => PostService.excluirPost(p), 'Post excluído.');
   }
 
-  Future<void> _desfavoritar(PostModel p) =>
-      _executar(() => UserService.definirFavorito(p.id, false), 'Removido dos favoritos.');
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(widget.favoritos ? 'Favoritos' : 'Meus posts')),
+      appBar: AppBar(title: const Text('Meus posts')),
       body: FutureBuilder<List<PostModel>>(
         future: _posts,
         builder: (context, snapshot) {
@@ -124,15 +106,13 @@ class _MeusPostsScreenState extends State<MeusPostsScreen> {
           }
           final posts = snapshot.data ?? const <PostModel>[];
           if (posts.isEmpty) {
-            return Center(
+            return const Center(
               child: Padding(
-                padding: const EdgeInsets.all(32),
+                padding: EdgeInsets.all(32),
                 child: Text(
-                  widget.favoritos
-                      ? 'Nenhum favorito ainda.\nToque no coração de um post para guardá-lo aqui.'
-                      : 'Você ainda não publicou nenhum post.',
+                  'Você ainda não publicou nenhum post.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppColors.textSecondary),
+                  style: TextStyle(color: AppColors.textSecondary),
                 ),
               ),
             );
@@ -161,29 +141,21 @@ class _MeusPostsScreenState extends State<MeusPostsScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.end,
-                        children: widget.favoritos
-                            ? [
-                                TextButton.icon(
-                                  onPressed: () => _desfavoritar(p),
-                                  icon: const Icon(Icons.heart_broken_outlined, size: 18),
-                                  label: const Text('Remover dos favoritos'),
-                                ),
-                              ]
-                            : [
-                                if (!p.isResolved)
-                                  TextButton.icon(
-                                    onPressed: () => _resolver(p),
-                                    icon: const Icon(Icons.check_circle_outline, size: 18),
-                                    label: const Text('Marcar como resolvido'),
-                                  ),
-                                TextButton.icon(
-                                  onPressed: () => _excluir(p),
-                                  style: TextButton.styleFrom(
-                                      foregroundColor: AppColors.primary),
-                                  icon: const Icon(Icons.delete_outline, size: 18),
-                                  label: const Text('Excluir'),
-                                ),
-                              ],
+                        children: [
+                          if (!p.isResolved)
+                            TextButton.icon(
+                              onPressed: () => _resolver(p),
+                              icon: const Icon(Icons.check_circle_outline, size: 18),
+                              label: const Text('Marcar como resolvido'),
+                            ),
+                          TextButton.icon(
+                            onPressed: () => _excluir(p),
+                            style: TextButton.styleFrom(
+                                foregroundColor: AppColors.primary),
+                            icon: const Icon(Icons.delete_outline, size: 18),
+                            label: const Text('Excluir'),
+                          ),
+                        ],
                       ),
                     ),
                   ],

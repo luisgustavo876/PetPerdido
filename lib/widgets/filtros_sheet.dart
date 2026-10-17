@@ -12,7 +12,6 @@ class FiltrosSheet extends StatefulWidget {
   final bool mostrarCor;
   final bool mostrarPeriodo;
   final bool mostrarResolvidos;
-  final bool mostrarFavoritos;
   final bool mostrarOrdem;
 
   const FiltrosSheet({
@@ -22,7 +21,6 @@ class FiltrosSheet extends StatefulWidget {
     this.mostrarCor = false,
     this.mostrarPeriodo = false,
     this.mostrarResolvidos = false,
-    this.mostrarFavoritos = false,
     this.mostrarOrdem = false,
   });
 
@@ -34,7 +32,6 @@ class FiltrosSheet extends StatefulWidget {
     bool mostrarCor = false,
     bool mostrarPeriodo = false,
     bool mostrarResolvidos = false,
-    bool mostrarFavoritos = false,
     bool mostrarOrdem = false,
   }) {
     return showModalBottomSheet<PostFilter>(
@@ -50,7 +47,6 @@ class FiltrosSheet extends StatefulWidget {
         mostrarCor: mostrarCor,
         mostrarPeriodo: mostrarPeriodo,
         mostrarResolvidos: mostrarResolvidos,
-        mostrarFavoritos: mostrarFavoritos,
         mostrarOrdem: mostrarOrdem,
       ),
     );
@@ -162,9 +158,6 @@ class _FiltrosSheetState extends State<FiltrosSheet> {
             _chip(p.rotulo, _f.periodo == p,
                 () => _alterar(_f.copyWith(periodo: p))),
         ]),
-      if (widget.mostrarFavoritos)
-        _interruptor('Só meus favoritos', _f.soFavoritos,
-            (v) => _alterar(_f.copyWith(soFavoritos: v))),
       if (widget.mostrarResolvidos)
         _interruptor('Incluir resolvidos', _f.incluirResolvidos,
             (v) => _alterar(_f.copyWith(incluirResolvidos: v))),

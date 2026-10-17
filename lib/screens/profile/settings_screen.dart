@@ -211,8 +211,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () => _alterarSenha(p.email)),
                 _item(Icons.article_outlined, 'Meus posts',
                     onTap: () => _abrir(const MeusPostsScreen())),
-                _item(Icons.favorite_border, 'Favoritos',
-                    onTap: () => _abrir(const MeusPostsScreen(favoritos: true))),
               ]),
               const SizedBox(height: 24),
               _titulo('ALERTAS DE PETS POR PERTO'),

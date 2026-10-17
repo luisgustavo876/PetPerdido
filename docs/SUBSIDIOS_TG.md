@@ -43,12 +43,12 @@ implementado** (outubro de 2026). Cada seção pode ser adaptada para o capítul
 
 | Caminho | Campos principais | Observações |
 |---|---|---|
-| `users/{uid}` | id, name, email, cpf, birthDate, points, createdAt, favorites[], alertsEnabled, alertRadiusKm, fcmToken, lastLocation{lat, lng, geohash, updatedAt} | Só o dono lê e escreve (protege CPF, e-mail e localização). |
+| `users/{uid}` | id, name, email, cpf (só os 11 dígitos), birthDate, points, createdAt, alertsEnabled, alertRadiusKm, fcmToken, lastLocation{lat, lng, geohash, updatedAt} | Só o dono lê e escreve (protege CPF, e-mail e localização). |
 | `users/{uid}/notifications/{id}` | title, body, postId, type, read, createdAt | Criadas só pela Cloud Function. |
 | `users/{uid}/pointsLog/{id}` | reason, delta, postId?, createdAt | Id fixo por ganho (`post_<id>`, `euvi_<id>`) evita pontuar duas vezes. |
 | `users/{uid}/redemptions/{id}` | rewardId, title, cost, code, createdAt | Resgates de recompensas (demonstração). |
 | `posts/{id}` | userId, userName, type (perdi/achei/avistei), petName, description, species, breed, size, sex, colors[], traits[], tags[], lastSeenAddress (bairro), latitude, longitude (arredondadas), geohash, photoUrl, createdAt, eventAt, isResolved, sightingsCount, helpersCount | Leitura pública; só o autor altera. |
-| `posts/{id}/sightings/{uid}` | userId, userName, address (bairro), lat, lng (arredondadas), notes, photoUrl?, createdAt | Id = uid de quem viu → no máximo 1 por pessoa. |
+| `posts/{id}/sightings/{uid}` | userId, userName, address (bairro), lat, lng (arredondadas), notes (descrição, mín. 10 caracteres), photoUrl?, createdAt | Id = uid de quem viu → no máximo 1 por pessoa. |
 | `chats/{postId_uidA_uidB}` | participants[2], participantNames{uid: nome}, postId, postTitle, lastMessage, lastMessageAt, unread{uid: n} | Id determinístico (uids em ordem alfabética). |
 | `chats/{id}/messages/{id}` | senderId, text, photoUrl?, createdAt, expireAt | `expireAt` = envio + 15 dias. A política TTL do Firestore (definida em código, `firestore.indexes.json`) apaga a mensagem depois dessa data. |
 
@@ -61,8 +61,9 @@ implementado** (outubro de 2026). Cada seção pode ser adaptada para o capítul
   pelo autor, que não pode trocar o dono. Outros usuários só somam **exatamente +1** em
   `sightingsCount`/`helpersCount`, e **somente no mesmo lote (batch)** em que criam o próprio
   avistamento (`existsAfter`).
-- **Avistamentos:** leitura pública; criação só no id do próprio usuário; remoção por quem registrou
-  ou pelo autor do post.
+- **Avistamentos:** leitura pública; criação só no id do próprio usuário e nunca vazia (bairro e
+  descrição com pelo menos 10 caracteres, a mesma regra da tela); remoção por quem registrou ou pelo
+  autor do post.
 - **Users e subcoleções:** só o dono. Notificações: o dono só pode alterar o campo `read`; ninguém as
   cria pelo app. Pontos e resgates: criar e apagar, nunca editar.
 - **Chats:** só os 2 participantes leem e escrevem; a criação confere o formato do id
@@ -167,6 +168,7 @@ no fim e confirmando a exclusão:**
 | 9 — Excluir conta | 33 | A sequência completa de exclusão passa pelas regras e não deixa dados. |
 | Fechamento | 11 | Autor não troca o dono do post; resolvido e "Eu vi" seguem funcionando. |
 | Chat × autor | 21 | Conversa só com o autor de um post existente; estranho e post inexistente bloqueados; mensagem sem `expireAt` bloqueada. |
+| Avistamento não vazio (emulador local do Firestore) | 14 | Descrição vazia, só espaços, curta ou ausente e bairro vazio são negados (o batch inteiro, com os contadores); avistamento completo segue funcionando. |
 | Alertas (ponta a ponta, Function publicada) | 22 | Autor publica post; usuário a ~0,6 km (raio 3 km) recebe o alerta "Pet perdido perto de você — Cão caramelo · Vila Barth, Itapetininga"; usuário a ~12 km e o autor não recebem; token inválido é removido. |
 
 **Validação manual (roteiro no PROGRESSO.md):** fluxo completo no Chrome e no celular Android

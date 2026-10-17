@@ -11,14 +11,13 @@ import '../../services/auth_service.dart';
 import '../../services/chat_service.dart';
 import '../../services/pontos_service.dart';
 import '../../services/post_service.dart';
-import '../../services/user_service.dart';
 import '../../widgets/foto_tela_cheia.dart';
 import '../../widgets/pet_image.dart';
 import '../chat/chat_screen.dart';
 import 'widgets/eu_vi_sheet.dart';
 
-/// Detalhe do post: dados do pet, avistamentos reais, favoritar,
-/// compartilhar e, para o autor, marcar como resolvido e excluir.
+/// Detalhe do post: dados do pet, avistamentos reais, compartilhar e,
+/// para o autor, marcar como resolvido e excluir.
 class DetailScreen extends StatefulWidget {
   final PostModel post;
 
@@ -35,7 +34,6 @@ class _DetailScreenState extends State<DetailScreen> {
   /// Stream único da tela, criado no initState.
   late Stream<List<SightingModel>> _avistamentosStream;
 
-  bool _favorito = false;
   bool _ocupado = false;
 
   String? get _meuUid => AuthService.currentUser?.uid;
@@ -45,33 +43,10 @@ class _DetailScreenState extends State<DetailScreen> {
   void initState() {
     super.initState();
     _avistamentosStream = PostService.avistamentosStream(_post.id);
-    _carregarFavorito();
-  }
-
-  Future<void> _carregarFavorito() async {
-    try {
-      final favs = await UserService.favoritos();
-      if (mounted) setState(() => _favorito = favs.contains(_post.id));
-    } catch (_) {
-      // Se não conseguir ler, o coração só aparece vazio.
-    }
   }
 
   void _mensagem(String texto) => ScaffoldMessenger.of(context)
       .showSnackBar(SnackBar(content: Text(texto)));
-
-  Future<void> _alternarFavorito() async {
-    final novo = !_favorito;
-    setState(() => _favorito = novo); // atualiza na hora
-    try {
-      await UserService.definirFavorito(_post.id, novo);
-      _mensagem(novo ? 'Adicionado aos favoritos.' : 'Removido dos favoritos.');
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _favorito = !novo); // desfaz
-      _mensagem('Não foi possível atualizar os favoritos.');
-    }
-  }
 
   Future<void> _compartilhar() async {
     await SharePlus.instance.share(ShareParams(
@@ -324,32 +299,20 @@ class _DetailScreenState extends State<DetailScreen> {
         Positioned(
           top: 40,
           right: 16,
-          child: Row(
-            children: [
-              _botaoHero(Icons.share_outlined, 'Compartilhar', _compartilhar),
-              const SizedBox(width: 8),
-              _botaoHero(
-                _favorito ? Icons.favorite : Icons.favorite_border,
-                _favorito ? 'Remover dos favoritos' : 'Favoritar',
-                _alternarFavorito,
-                cor: _favorito ? AppColors.primary : null,
-              ),
-            ],
-          ),
+          child: _botaoHero(Icons.share_outlined, 'Compartilhar', _compartilhar),
         ),
       ],
     );
   }
 
-  Widget _botaoHero(IconData icone, String dica, VoidCallback onTap,
-      {Color? cor}) {
+  Widget _botaoHero(IconData icone, String dica, VoidCallback onTap) {
     return Material(
       color: Colors.white.withValues(alpha: 0.9),
       shape: const CircleBorder(),
       child: IconButton(
         tooltip: dica,
         onPressed: onTap,
-        icon: Icon(icone, size: 20, color: cor ?? AppColors.onSurface),
+        icon: Icon(icone, size: 20, color: AppColors.onSurface),
       ),
     );
   }

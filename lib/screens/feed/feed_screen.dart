@@ -5,12 +5,11 @@ import '../../models/post_filter.dart';
 import '../../models/post_model.dart';
 import '../../services/location_service.dart';
 import '../../services/post_service.dart';
-import '../../services/user_service.dart';
 import '../../widgets/filtros_sheet.dart';
 import '../../widgets/pet_post_card.dart';
 import 'detail_screen.dart';
 
-/// Feed: lista de posts com busca, filtros, favoritos e ordenação.
+/// Feed: lista de posts com busca, filtros e ordenação.
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
 
@@ -28,7 +27,6 @@ class _FeedScreenState extends State<FeedScreen> {
   String _busca = '';
 
   PostFilter _filtro = const PostFilter();
-  Set<String> _favoritos = {};
   ({double lat, double lng})? _minhaPosicao;
 
   static const _atalhosTipo = [
@@ -42,7 +40,6 @@ class _FeedScreenState extends State<FeedScreen> {
   void initState() {
     super.initState();
     _postsStream = PostService.postsStream();
-    _carregarFavoritos();
     _posicaoSemPedir();
   }
 
@@ -54,15 +51,6 @@ class _FeedScreenState extends State<FeedScreen> {
 
   void _tentarDeNovo() =>
       setState(() => _postsStream = PostService.postsStream());
-
-  Future<void> _carregarFavoritos() async {
-    try {
-      final favs = await UserService.favoritos();
-      if (mounted) setState(() => _favoritos = favs);
-    } catch (_) {
-      // Sem favoritos (ex.: offline): o filtro só não encontra nada.
-    }
-  }
 
   /// Distâncias nos cards, se o usuário já tiver dado permissão de localização.
   Future<void> _posicaoSemPedir() async {
@@ -76,13 +64,11 @@ class _FeedScreenState extends State<FeedScreen> {
       inicial: _filtro,
       mostrarPorte: true,
       mostrarCor: true,
-      mostrarFavoritos: true,
       mostrarResolvidos: true,
       mostrarOrdem: true,
     );
     if (novo == null || !mounted) return;
     setState(() => _filtro = novo);
-    if (novo.soFavoritos) _carregarFavoritos();
     if (novo.ordem == OrdemFeed.maisPerto && _minhaPosicao == null) {
       await _pedirPosicao();
     }
@@ -110,7 +96,7 @@ class _FeedScreenState extends State<FeedScreen> {
   List<PostModel> _aplicar(List<PostModel> posts) {
     final agora = DateTime.now();
     final lista = posts
-        .where((p) => _filtro.aceita(p, agora: agora, favoritos: _favoritos))
+        .where((p) => _filtro.aceita(p, agora: agora))
         .where((p) => PostFilter.buscaCorresponde(p, _busca))
         .toList();
     if (_filtro.ordem == OrdemFeed.maisPerto && _minhaPosicao != null) {
@@ -124,7 +110,6 @@ class _FeedScreenState extends State<FeedScreen> {
       context,
       MaterialPageRoute(builder: (_) => DetailScreen(post: post)),
     );
-    _carregarFavoritos(); // pode ter favoritado lá dentro
   }
 
   @override

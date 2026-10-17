@@ -77,12 +77,6 @@ void main() {
     expect(f7.aceita(post(ha: const Duration(days: 8)), agora: agora), isFalse);
   });
 
-  test('só favoritos', () {
-    const f = PostFilter(soFavoritos: true);
-    expect(f.aceita(post(id: 'a'), agora: agora, favoritos: {'a'}), isTrue);
-    expect(f.aceita(post(id: 'b'), agora: agora, favoritos: {'a'}), isFalse);
-  });
-
   test('copyWith com null limpa o campo; sem passar, mantém', () {
     final f = const PostFilter(especie: 'Gato', cor: 'Preto');
     expect(f.copyWith(especie: null).especie, isNull);

@@ -10,25 +10,29 @@ a partir da foto.
 
 ## Funcionalidades
 
-- **Cadastro e login** com CPF validado (dígitos verificadores) e idade mínima de 16 anos.
-- **Criar post em 5 etapas:** tipo, foto (obrigatória em Perdi/Achei), dados do pet, local no
+- **Cadastro e login** com CPF validado (dígitos verificadores, máscara 000.000.000-00) e data
+  de nascimento digitada (DD/MM/AAAA) com idade mínima de 16 anos. O usuário aparece sempre
+  pelo nome, nunca pelo e-mail.
+- **Criar post em 5 etapas:** tipo, foto (obrigatória em Perdi/Achei), dados do pet (22
+  características prontas e até 5 próprias), local no
   mapa (bairro preenchido sozinho) e data; revisão com **possíveis correspondências** (posts
   semelhantes de tipo oposto, até 3 km e 7 dias).
 - **IA:** "Preencher com IA" a partir da foto (ou da descrição, em Avistei sem foto) — sugestões
   editáveis de espécie, porte, cores, raça e características.
 - **Mapa** com marcadores por tipo, filtros (tipo, espécie, período, resolvidos), satélite e
   "Minha localização".
-- **Feed** com busca, filtros (tipo, espécie, porte, cor, favoritos), ordem por data ou
-  distância, e "há 2 h · a 1,2 km" em cada card.
-- **Detalhe:** "Eu vi este pet" (avistamentos reais na linha do tempo), favoritar, compartilhar,
-  "Entrar em contato", e para o autor: marcar como resolvido e excluir.
+- **Feed** com busca, filtros (tipo, espécie, porte, cor), ordem por data ou
+  distância, e "há 2 h · a 1,2 km" em cada card. Fotos inteiras, sem recorte.
+- **Detalhe:** foto com zoom em tela cheia, "Eu vi este pet" (avistamentos com bairro e
+  descrição, na linha do tempo), compartilhar, "Entrar em contato", e para o autor: marcar como
+  resolvido e excluir.
 - **Alertas por proximidade:** Cloud Function + FCM avisa quem está dentro do raio escolhido
   (1, 3, 5 ou 10 km). Sino com as notificações no app.
 - **Chat** em tempo real com texto e foto, filtro de palavrões e mensagens que somem em 15 dias.
 - **Pontos e recompensas** (demonstração): Achei +30, Avistei +10, "Eu vi" +15; resgate com
   código de voucher.
-- **Configurações e LGPD:** perfil (CPF mascarado), preferências de alerta, meus posts,
-  favoritos, Termos de Uso, Política de Privacidade e "Excluir minha conta".
+- **Configurações e LGPD:** perfil (nome, CPF mascarado e pontos), preferências de alerta,
+  meus posts, Termos de Uso, Política de Privacidade e "Excluir minha conta".
 
 ## Stack
 
@@ -77,7 +81,8 @@ lib/
 │                 similaridade, filtro de palavrões, opções do pet, recompensas
 ├── models/     → PostModel, SightingModel, ChatModel, NotificacaoModel, SugestaoIA, PostFilter
 ├── services/   → Auth, Post, Storage, User, Location, AI, Alerta, Pontos, Chat, Conta
-├── widgets/    → PetPostCard, PetImage, FiltrosSheet, SeletorImagem, botões e campos
+├── widgets/    → PetPostCard, PetImage, FotoTelaCheia, FiltrosSheet, SeletorImagem, botões
+│                 e campos
 ├── screens/
 │   ├── auth/     → Login, Cadastro
 │   ├── map/      → Mapa
