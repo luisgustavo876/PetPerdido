@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/app_constants.dart';
+import '../core/formatters.dart';
 
 class AuthService {
   static final _auth = FirebaseAuth.instance;
@@ -95,11 +96,23 @@ class AuthService {
   /// Retorna a mensagem de erro, ou null se estiver tudo certo.
   static String? validarNascimento(DateTime? nascimento, DateTime hoje) {
     if (nascimento == null) return 'Informe a data de nascimento';
-    if (nascimento.isAfter(hoje)) return 'Data de nascimento inválida';
+    if (nascimento.isAfter(hoje)) {
+      return 'A data de nascimento não pode ser no futuro';
+    }
     if (idadeEmAnos(nascimento, hoje) < AppConstants.minAge) {
       return 'Você precisa ter pelo menos ${AppConstants.minAge} anos';
     }
     return null;
+  }
+
+  /// Mesma validação, a partir do texto digitado no campo (DD/MM/AAAA).
+  static String? validarNascimentoTexto(String texto, DateTime hoje) {
+    final digitos = texto.replaceAll(RegExp(r'\D'), '');
+    if (digitos.isEmpty) return 'Informe a data de nascimento';
+    if (digitos.length < 8) return 'Data incompleta. Use DD/MM/AAAA';
+    final data = Formatters.lerData(texto);
+    if (data == null) return 'Data inválida. Confira o dia, o mês e o ano';
+    return validarNascimento(data, hoje);
   }
 
   /// Envia o e-mail de redefinição de senha.

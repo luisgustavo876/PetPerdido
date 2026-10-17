@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_colors.dart';
 import '../../core/app_constants.dart';
+import '../../core/formatters.dart';
 import '../../core/input_formatters.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/custom_button.dart';
@@ -24,8 +25,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _cpfController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
-  final _birthController = TextEditingController(); // só exibe dd/mm/aaaa
-  DateTime? _birthDate;
+  final _birthController = TextEditingController(); // DD/MM/AAAA
   bool _isLoading = false;
 
   @override
@@ -41,15 +41,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   static String _soDigitos(String texto) => texto.replaceAll(RegExp(r'\D'), '');
 
-  /// Formata a data como dd/mm/aaaa.
-  String _formatarData(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-
   Future<void> _pickBirthDate() async {
     final hoje = DateTime.now();
+    final digitada = Formatters.lerData(_birthController.text);
     final escolhida = await showDatePicker(
       context: context,
-      initialDate: _birthDate ?? DateTime(hoje.year - 18, hoje.month, hoje.day),
+      locale: const Locale('pt', 'BR'),
+      initialDate: digitada != null && !digitada.isAfter(hoje)
+          ? digitada
+          : DateTime(hoje.year - 18, hoje.month, hoje.day),
       firstDate: DateTime(1900),
       lastDate: hoje,
       helpText: 'Data de nascimento',
@@ -61,10 +61,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       errorInvalidText: 'Data fora do intervalo permitido',
     );
     if (escolhida == null) return;
-    setState(() {
-      _birthDate = escolhida;
-      _birthController.text = _formatarData(escolhida);
-    });
+    setState(() => _birthController.text = Formatters.data(escolhida));
   }
 
   Future<void> _onRegister() async {
@@ -77,7 +74,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: _emailController.text,
         password: _passwordController.text,
         cpf: _soDigitos(_cpfController.text), // grava só os 11 dígitos
-        birthDate: _birthDate!,
+        // Já validada pelo formulário: a data existe e não é nula.
+        birthDate: Formatters.lerData(_birthController.text)!,
       );
       // Conta e documento users/{uid} gravados. A RegisterScreen está
       // empilhada sobre o _AuthGate (que já mostra a MainScreen): volta até ele.
@@ -204,20 +202,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 14),
-                // Campo só de leitura: abre o calendário ao tocar.
+                // Digita só os números (29062006 → 29/06/2006) ou escolhe no
+                // calendário pelo ícone.
                 TextFormField(
                   controller: _birthController,
-                  readOnly: true,
-                  onTap: _pickBirthDate,
-                  decoration: const InputDecoration(
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [MascaraInputFormatter.data()],
+                  decoration: InputDecoration(
                     labelText: 'Data de nascimento',
-                    hintText: 'dd/mm/aaaa',
-                    hintStyle: TextStyle(color: AppColors.textSecondary),
-                    prefixIcon: Icon(Icons.cake_outlined,
+                    hintText: 'DD/MM/AAAA',
+                    hintStyle: const TextStyle(color: AppColors.textSecondary),
+                    prefixIcon: const Icon(Icons.cake_outlined,
                         color: AppColors.textSecondary, size: 20),
+                    suffixIcon: IconButton(
+                      tooltip: 'Escolher no calendário',
+                      icon: const Icon(Icons.calendar_month_outlined,
+                          color: AppColors.textSecondary, size: 20),
+                      onPressed: _pickBirthDate,
+                    ),
                   ),
-                  validator: (_) =>
-                      AuthService.validarNascimento(_birthDate, DateTime.now()),
+                  validator: (v) => AuthService.validarNascimentoTexto(
+                      v ?? '', DateTime.now()),
                 ),
                 const SizedBox(height: 14),
                 CustomTextField(

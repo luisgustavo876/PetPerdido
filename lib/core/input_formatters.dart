@@ -13,6 +13,9 @@ class MascaraInputFormatter extends TextInputFormatter {
   /// CPF: 000.000.000-00.
   factory MascaraInputFormatter.cpf() => MascaraInputFormatter('###.###.###-##');
 
+  /// Data: DD/MM/AAAA (8 dígitos).
+  factory MascaraInputFormatter.data() => MascaraInputFormatter('##/##/####');
+
   /// Quantidade máxima de dígitos aceitos pelo padrão.
   int get maxDigitos => '#'.allMatches(padrao).length;
 

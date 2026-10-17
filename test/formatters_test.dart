@@ -11,6 +11,23 @@ void main() {
     });
   });
 
+  group('data e lerData (DD/MM/AAAA)', () {
+    test('formata no padrão brasileiro', () {
+      expect(Formatters.data(DateTime(2006, 6, 9)), '09/06/2006');
+    });
+
+    test('lê com ou sem barras', () {
+      expect(Formatters.lerData('29/06/2006'), DateTime(2006, 6, 29));
+      expect(Formatters.lerData('29062006'), DateTime(2006, 6, 29));
+    });
+
+    test('incompleta ou inexistente devolve null', () {
+      expect(Formatters.lerData('29/06/20'), isNull);
+      expect(Formatters.lerData('31/04/2006'), isNull);
+      expect(Formatters.lerData('10/10/1899'), isNull);
+    });
+  });
+
   group('tempoRelativo', () {
     final agora = DateTime(2026, 10, 16, 12);
     test('minutos, horas e dias', () {

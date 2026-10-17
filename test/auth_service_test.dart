@@ -83,4 +83,35 @@ void main() {
           isNotNull);
     });
   });
+
+  group('validarNascimentoTexto (campo DD/MM/AAAA)', () {
+    final hoje = DateTime(2026, 10, 15);
+    String? validar(String t) => AuthService.validarNascimentoTexto(t, hoje);
+
+    test('aceita data real com idade suficiente', () {
+      expect(validar('29/06/2006'), isNull);
+      expect(validar('15/10/2010'), isNull); // 16 anos exatos
+    });
+
+    test('vazio e incompleto têm mensagens próprias', () {
+      expect(validar(''), 'Informe a data de nascimento');
+      expect(validar('29/06/20'), contains('incompleta'));
+    });
+
+    test('rejeita dia ou mês que não existem', () {
+      expect(validar('31/02/2006'), contains('inválida'));
+      expect(validar('29/02/2007'), contains('inválida')); // não bissexto
+      expect(validar('15/13/2006'), contains('inválida'));
+      expect(validar('00/06/2006'), contains('inválida'));
+    });
+
+    test('aceita 29/02 em ano bissexto', () {
+      expect(validar('29/02/2008'), isNull);
+    });
+
+    test('rejeita futuro e menor de ${AppConstants.minAge} anos', () {
+      expect(validar('01/01/2027'), contains('futuro'));
+      expect(validar('16/10/2010'), contains('${AppConstants.minAge} anos'));
+    });
+  });
 }

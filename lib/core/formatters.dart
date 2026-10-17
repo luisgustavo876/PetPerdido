@@ -30,6 +30,27 @@ class Formatters {
     return 'em ${dois(data.day)}/${dois(data.month)}/${data.year}';
   }
 
+  /// "29/06/2006" (padrão brasileiro).
+  static String data(DateTime d) {
+    String dois(int n) => n.toString().padLeft(2, '0');
+    return '${dois(d.day)}/${dois(d.month)}/${d.year}';
+  }
+
+  /// Lê "29/06/2006" (ou "29062006"). Retorna null se estiver incompleta ou
+  /// se o dia/mês não existir (ex.: 31/02/2006, 15/13/2006).
+  static DateTime? lerData(String texto) {
+    final digitos = texto.replaceAll(RegExp(r'\D'), '');
+    if (digitos.length != 8) return null;
+    final dia = int.parse(digitos.substring(0, 2));
+    final mes = int.parse(digitos.substring(2, 4));
+    final ano = int.parse(digitos.substring(4));
+    if (ano < 1900 || mes < 1 || mes > 12 || dia < 1) return null;
+    final data = DateTime(ano, mes, dia);
+    // DateTime "rola" datas inválidas (31/02 vira 03/03): confere de volta.
+    if (data.day != dia || data.month != mes || data.year != ano) return null;
+    return data;
+  }
+
   /// "a 350 m", "a 1,2 km" ou "a 15 km".
   static String distancia(double km) {
     if (km < 1) {

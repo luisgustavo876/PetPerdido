@@ -56,4 +56,18 @@ void main() {
       expect(r.selection.end, 2);
     });
   });
+
+  group('MascaraInputFormatter.data', () {
+    final f = MascaraInputFormatter.data();
+
+    test('29062006 vira 29/06/2006', () {
+      expect(digitar(f, '', '2').text, '2');
+      expect(digitar(f, '29', '290').text, '29/0');
+      expect(digitar(f, '', '29062006').text, '29/06/2006');
+    });
+
+    test('no máximo 8 dígitos', () {
+      expect(digitar(f, '', '290620061').text, '29/06/2006');
+    });
+  });
 }
