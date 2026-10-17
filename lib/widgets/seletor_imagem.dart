@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/app_colors.dart';
+import '../core/app_constants.dart';
 
 /// Pergunta de onde vem a foto ("Tirar foto" só fora da Web, ou
 /// "Escolher da galeria") e abre o seletor. Retorna null se cancelar.
@@ -40,11 +41,13 @@ class SeletorImagem {
       ),
     );
     if (origem == null) return null;
+    // Sem recorte: o seletor só reduz mantendo a proporção (lado maior até
+    // 1600 px). O StorageService confere de novo antes de enviar.
     return ImagePicker().pickImage(
       source: origem,
-      maxWidth: 1200,
-      maxHeight: 1200,
-      imageQuality: 85,
+      maxWidth: AppConstants.fotoMaxPixels.toDouble(),
+      maxHeight: AppConstants.fotoMaxPixels.toDouble(),
+      imageQuality: AppConstants.fotoQualidade,
     );
   }
 }

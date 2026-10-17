@@ -6,6 +6,7 @@ import '../core/filtro_palavroes.dart';
 import '../models/chat_model.dart';
 import '../models/post_model.dart';
 import 'auth_service.dart';
+import 'storage_service.dart';
 
 /// Erro do chat com mensagem pronta para o usuário.
 class ChatException implements Exception {
@@ -109,8 +110,8 @@ class ChatService {
     if (eu == null) throw const ChatException('Entre na sua conta.');
     final msgRef = _chats.doc(chat.id).collection('messages').doc();
     final ref = FirebaseStorage.instance.ref('chats/${chat.id}/${msgRef.id}.jpg');
-    await ref.putData(
-        await foto.readAsBytes(), SettableMetadata(contentType: 'image/jpeg'));
+    await ref.putData(await StorageService.bytesParaEnvio(foto),
+        SettableMetadata(contentType: 'image/jpeg'));
     final url = await ref.getDownloadURL();
     await _gravar(chat, fotoUrl: url, previa: '📷 Foto', msgRef: msgRef);
   }

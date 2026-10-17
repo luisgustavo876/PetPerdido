@@ -33,6 +33,12 @@ class AppConstants {
   static const String geminiModel = 'gemini-3.5-flash';
   static const int iaMaxPixels = 1024;
 
+  // Fotos enviadas ao Storage: sem recorte, no máximo 1600 px no lado maior,
+  // JPEG qualidade 85 e abaixo do limite de 5 MB do storage.rules.
+  static const int fotoMaxPixels = 1600;
+  static const int fotoQualidade = 85;
+  static const int fotoMaxBytes = 5 * 1024 * 1024;
+
   // Alertas por proximidade (geofencing + push)
   static const List<int> alertRadiosKm = [1, 3, 5, 10];
   static const int alertRadiusPadraoKm = 3;

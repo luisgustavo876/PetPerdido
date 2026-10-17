@@ -1,3 +1,4 @@
+import 'dart:ui' show ImageFilter;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
@@ -14,11 +15,20 @@ class PetImage extends StatelessWidget {
   final BoxFit fit;
   final double iconSize;
 
+  /// Altura da imagem. null = altura pela proporção original da foto.
+  final double? height;
+
+  /// Mostra a foto inteira (BoxFit.contain) sobre uma versão desfocada dela
+  /// mesma, para preencher o espaço sem recortar o pet.
+  final bool semCorte;
+
   const PetImage({
     super.key,
     required this.url,
     this.fit = BoxFit.cover,
     this.iconSize = 48,
+    this.height = double.infinity,
+    this.semCorte = false,
   });
 
   /// Versão "ImageProvider" para usar em CircleAvatar.backgroundImage.
@@ -50,20 +60,35 @@ class PetImage extends StatelessWidget {
 
     if (url == null || url!.isEmpty) return placeholder;
 
+    if (semCorte) {
+      return ImagemSemCorte(
+        imagem: (fit, {required bool fundo}) =>
+            _imagem(fit, placeholder, fundo: fundo),
+      );
+    }
+    return _imagem(fit, placeholder);
+  }
+
+  /// A imagem em si. [fundo] = cópia desfocada (sem indicador nem ícone).
+  Widget _imagem(BoxFit fit, Widget placeholder, {bool fundo = false}) {
+    final carregando = fundo
+        ? const SizedBox.shrink()
+        : const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    final erro = fundo ? const SizedBox.shrink() : placeholder;
+
     if (url!.startsWith('http')) {
       if (kIsWeb) {
         return Image.network(
           url!,
           fit: fit,
           width: double.infinity,
-          height: double.infinity,
+          height: height,
           webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
-          loadingBuilder: (_, child, progresso) => progresso == null
-              ? child
-              : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-          errorBuilder: (_, erro, __) {
-            _logarErro(url!, erro);
-            return placeholder;
+          loadingBuilder: (_, child, progresso) =>
+              progresso == null ? child : carregando,
+          errorBuilder: (_, e, __) {
+            if (!fundo) _logarErro(url!, e);
+            return erro;
           },
         );
       }
@@ -71,12 +96,11 @@ class PetImage extends StatelessWidget {
         imageUrl: url!,
         fit: fit,
         width: double.infinity,
-        height: double.infinity,
-        placeholder: (_, __) =>
-            const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        errorWidget: (_, __, erro) {
-          _logarErro(url!, erro);
-          return placeholder;
+        height: height,
+        placeholder: (_, __) => carregando,
+        errorWidget: (_, __, e) {
+          if (!fundo) _logarErro(url!, e);
+          return erro;
         },
       );
     }
@@ -85,11 +109,38 @@ class PetImage extends StatelessWidget {
       url!,
       fit: fit,
       width: double.infinity,
-      height: double.infinity,
-      errorBuilder: (_, erro, __) {
-        _logarErro(url!, erro);
-        return placeholder;
+      height: height,
+      errorBuilder: (_, e, __) {
+        if (!fundo) _logarErro(url!, e);
+        return erro;
       },
+    );
+  }
+}
+
+/// Foto inteira (BoxFit.contain) sobre uma cópia desfocada e ampliada dela
+/// mesma: preenche um espaço de altura fixa sem recortar a foto.
+class ImagemSemCorte extends StatelessWidget {
+  /// Monta a imagem com o [BoxFit] pedido; [fundo] indica a cópia desfocada.
+  final Widget Function(BoxFit fit, {required bool fundo}) imagem;
+
+  const ImagemSemCorte({super.key, required this.imagem});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ClipRect(
+          child: ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: imagem(BoxFit.cover, fundo: true),
+          ),
+        ),
+        // Escurece um pouco o fundo para a foto principal se destacar.
+        const ColoredBox(color: Color(0x33000000)),
+        imagem(BoxFit.contain, fundo: false),
+      ],
     );
   }
 }

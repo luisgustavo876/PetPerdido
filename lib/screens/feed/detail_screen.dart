@@ -12,6 +12,7 @@ import '../../services/chat_service.dart';
 import '../../services/pontos_service.dart';
 import '../../services/post_service.dart';
 import '../../services/user_service.dart';
+import '../../widgets/foto_tela_cheia.dart';
 import '../../widgets/pet_image.dart';
 import '../chat/chat_screen.dart';
 import 'widgets/eu_vi_sheet.dart';
@@ -264,26 +265,52 @@ class _DetailScreenState extends State<DetailScreen> {
         ),
       );
 
+  /// Foto na largura total, com a proporção original (sem recorte).
+  /// Toque abre em tela cheia com zoom.
+  Widget _foto() {
+    final url = _post.photoUrl;
+    if (url == null || url.isEmpty) {
+      return Container(
+        height: 300,
+        width: double.infinity,
+        color: AppColors.background,
+        child: const PetImage(url: null, iconSize: 80),
+      );
+    }
+    return GestureDetector(
+      onTap: () => FotoTelaCheia.abrir(context, url),
+      child: Container(
+        width: double.infinity,
+        color: AppColors.background,
+        // Mínimo enquanto carrega; máximo para fotos muito altas.
+        constraints: BoxConstraints(
+          minHeight: 240,
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
+        child: PetImage(
+            url: url, fit: BoxFit.contain, height: null, iconSize: 80),
+      ),
+    );
+  }
+
   Widget _hero() {
     return Stack(
       children: [
-        Container(
-          height: 300,
-          width: double.infinity,
-          color: AppColors.background,
-          child: PetImage(url: _post.photoUrl, iconSize: 80),
-        ),
+        _foto(),
         Positioned(
           top: 0,
           left: 0,
           right: 0,
-          child: Container(
-            height: 104,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.black45, Colors.transparent],
+          // Só decoração: o toque passa para a foto (ampliar).
+          child: IgnorePointer(
+            child: Container(
+              height: 104,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.black45, Colors.transparent],
+                ),
               ),
             ),
           ),

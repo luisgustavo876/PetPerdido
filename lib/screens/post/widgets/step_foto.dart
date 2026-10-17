@@ -55,19 +55,24 @@ class StepFoto extends StatelessWidget {
           'Foto',
           complemento: EtiquetaObrigatoria(obrigatoria: draft.fotoObrigatoria),
         ),
-        AspectRatio(
-          aspectRatio: 4 / 3,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: bytes == null
-                ? _areaVazia(context)
-                : ClipRRect(
-                    key: ValueKey(bytes.hashCode),
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.memory(bytes,
-                        fit: BoxFit.cover, width: double.infinity),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: bytes == null
+              ? AspectRatio(aspectRatio: 4 / 3, child: _areaVazia(context))
+              // Foto inteira, sem recorte: a altura acompanha a proporção da
+              // foto (com limite, para fotos muito altas caberem na tela).
+              : ClipRRect(
+                  key: ValueKey(bytes.hashCode),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    width: double.infinity,
+                    color: AppColors.inputFill,
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.5,
+                    ),
+                    child: Image.memory(bytes, fit: BoxFit.contain),
                   ),
-          ),
+                ),
         ),
         if (bytes != null) ...[
           const SizedBox(height: 16),

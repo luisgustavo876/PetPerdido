@@ -52,13 +52,18 @@ class PetPostCard extends StatelessWidget {
   Widget _imagem() {
     return Stack(
       children: [
+        // Altura fixa; a foto aparece inteira (sem recorte) sobre um fundo
+        // desfocado dela mesma.
         Container(
           height: 208,
           width: double.infinity,
           color: AppColors.background,
           child: fotoLocal != null
-              ? Image.memory(fotoLocal!, fit: BoxFit.cover)
-              : PetImage(url: post.photoUrl, iconSize: 64),
+              ? ImagemSemCorte(
+                  imagem: (fit, {required fundo}) => Image.memory(fotoLocal!,
+                      fit: fit, width: double.infinity, height: double.infinity),
+                )
+              : PetImage(url: post.photoUrl, iconSize: 64, semCorte: true),
         ),
         Positioned(
           top: 12,
