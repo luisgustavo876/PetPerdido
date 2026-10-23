@@ -22,6 +22,11 @@ Firestore e do Storage publicadas e validadas por REST (inclusive a de avistamen
 | 6 | 9 Configurações, perfil e LGPD | ✅ Feito |
 | 7 | Fechamento (limpeza, regras, README, docs/SUBSIDIOS_TG.md) | ✅ Feito |
 
+**Versão Web publicada (23/10/2026):** https://petperdido-ff844.web.app (Firebase Hosting, seção
+`hosting` no `firebase.json` servindo `build/web`). Conferido no domínio publicado: login, mapa e feed
+com fotos. Domínio já autorizado no Firebase Auth. Para atualizar: `flutter build web --release` e
+`firebase deploy --only hosting`.
+
 ### O que falta
 
 1. ~~Deploy da Cloud Function~~ — **feito em 16/10/2026** e testado ponta a ponta (22/22): só o usuário

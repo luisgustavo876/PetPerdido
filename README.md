@@ -55,6 +55,16 @@ flutter run -d web-server --web-port 8080
 # e abra http://localhost:8080
 ```
 
+### Versão Web publicada (Firebase Hosting)
+
+O app está em **https://petperdido-ff844.web.app** (abre no navegador do celular; push só no app
+Android). Para publicar de novo:
+
+```bash
+flutter build web --release
+firebase deploy --only hosting
+```
+
 Build de teste do Android: `flutter build apk --debug`
 (arquivo em `build/app/outputs/flutter-apk/app-debug.apk`).
 
