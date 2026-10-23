@@ -122,6 +122,12 @@ void main() {
           contains('não foi ativada'));
       expect(AIService.mensagemDeErro(FirebaseAIException('erro 500')),
           contains('não conseguiu responder'));
+      // 429 do Gemini quando os créditos pré-pagos do projeto acabam.
+      expect(
+          AIService.mensagemDeErro(FirebaseAIException(
+              'Your prepayment credits are depleted. Please go to AI Studio '
+              'to manage your project and billing.')),
+          contains('limite de uso do projeto'));
       expect(AIService.mensagemDeErro(Exception('SocketException')),
           contains('sem internet'));
     });

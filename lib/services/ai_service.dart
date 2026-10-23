@@ -102,6 +102,13 @@ se for mestiço ou incerto. Para características, só as que forem visíveis
     }
     if (erro is FirebaseAIException) {
       final msg = erro.message.toLowerCase();
+      // Créditos pré-pagos do projeto acabaram / cobrança (erro 429 do Gemini).
+      if (msg.contains('credits') ||
+          msg.contains('prepay') ||
+          msg.contains('billing')) {
+        return 'A IA está indisponível no momento (limite de uso do projeto). '
+            'Preencha manualmente.';
+      }
       if (msg.contains('quota') ||
           msg.contains('exhausted') ||
           msg.contains('rate limit')) {
