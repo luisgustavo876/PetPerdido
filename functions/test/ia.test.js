@@ -68,10 +68,9 @@ test("extrai o texto da resposta e ignora o raciocínio", () => {
   assert.equal(extrairTexto({candidates: [{content: {parts: []}}]}), null);
 });
 
-test("troca de modelo só em limite (429) ou modelo inexistente (404)", () => {
+test("troca de modelo em limite, modelo inexistente e erro passageiro", () => {
   assert.ok(MODELOS.length >= 2);
-  assert.equal(tentarProximoModelo(429), true);
-  assert.equal(tentarProximoModelo(404), true);
-  assert.equal(tentarProximoModelo(400), false);
-  assert.equal(tentarProximoModelo(500), false);
+  for (const s of [429, 404, 500, 502, 503, 504]) assert.equal(tentarProximoModelo(s), true, s);
+  // Erro do pedido ou da chave: trocar de modelo não resolve.
+  for (const s of [400, 401, 403]) assert.equal(tentarProximoModelo(s), false, s);
 });

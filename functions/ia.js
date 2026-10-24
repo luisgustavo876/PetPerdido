@@ -4,12 +4,13 @@
  */
 
 // Modelos tentados em ordem. No nível gratuito cada modelo tem a sua cota:
-// se um responder 429 (limite) ou 404 (não existe), tenta o próximo.
+// se um responder 429 (limite), 404 (não existe) ou 5xx (sobrecarregado),
+// tenta o próximo.
 const MODELOS = [
   "gemini-3.6-flash",
   "gemini-3.8-flash",
   "gemini-3.5-flash-lite",
-  "gemini-2.5-flash",
+  "gemini-flash-latest", // apelido do Flash mais novo
 ];
 
 const INSTRUCOES = `Você ajuda um app de pets perdidos a descrever animais.
@@ -110,9 +111,12 @@ function extrairTexto(resposta) {
   return texto || null;
 }
 
-/** Vale tentar o próximo modelo? (limite do modelo ou modelo inexistente) */
+/**
+ * Vale tentar o próximo modelo? Limite do modelo (429), modelo inexistente
+ * (404) ou erro passageiro do Google (500, 502, 503 "sobrecarregado", 504).
+ */
 function tentarProximoModelo(status) {
-  return status === 429 || status === 404;
+  return [404, 429, 500, 502, 503, 504].includes(status);
 }
 
 module.exports = {

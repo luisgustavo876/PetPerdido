@@ -15,7 +15,7 @@ Firestore e do Storage publicadas e validadas por REST (inclusive a de avistamen
 |---|---|---|
 | — | 0 Limpeza · 1 Regras · 2 Login/Cadastro · 3 Criar Post | ✅ Feito |
 | 1 | 4 Mapa · 5 Feed · 6 Detalhe | ✅ Feito |
-| 2 | IA (Gemini) | ✅ Código pronto (Function `analisarPet`) · ⏸️ chave gratuita + deploy da Function |
+| 2 | IA (Gemini) | ✅ Function `analisarPet` publicada (23/10) com chave gratuita; testada em produção |
 | 3 | Geofencing + Push | ✅ Function publicada (16/10) e testada ponta a ponta |
 | 4 | 7 Pontos e recompensas | ✅ Feito |
 | 5 | 8 Chat | ✅ Feito (TTL publicado por código) |
@@ -149,6 +149,12 @@ com fotos. Domínio já autorizado no Firebase Auth. Para atualizar: `flutter bu
   permitidos vão do app para a Function (uma fonte só: `PetOptions`).
 - **IA — nível gratuito:** tem limite diário por modelo e o Google pode usar o conteúdo enviado para
   melhorar os produtos; avisado na tela e na Política de Privacidade.
+- **IA — publicada (23/10/2026):** segredo `GEMINI_API_KEY` (versão 1, projeto "PetPerdido IA" sem
+  faturamento) e Function publicada. Teste em produção com usuário de teste (apagado): foto de
+  cachorro → "Labrador, Branco/Dourado, Grande, Sem coleira, Pelo curto, Orelhas caídas"; descrição
+  → "Gato preto pequeno, assustado"; sem login → 401; pedido vazio → 400; preflight e POST com a
+  origem do site → 204/200 com CORS. Primeira chamada ~29 s (instância fria + modelo que "pensa"),
+  depois ~5 s. Em 503 (Gemini sobrecarregado) a Function passa para o próximo modelo.
 - **IA — dados:** a foto é reduzida (máx. 1024 px, JPEG 80) antes de enviar. O prompt manda ignorar
   pessoas e responder "Indefinido" sem cão/gato. A resposta só é aceita com valores das listas do app
   (espécie, porte, até 2 cores, características); raça limitada a 40 caracteres.
@@ -218,7 +224,7 @@ build no Artifact Registry (região southamerica-east1). Sem ela, cada novo depl
 `firebase functions:artifacts:setpolicy --location southamerica-east1`
 (ou, no próximo deploy, `firebase deploy --only functions --force`).
 
-### 2. Chave gratuita da IA (necessária para "Preencher com IA")
+### 2. ~~Chave gratuita da IA~~ — feito em 23/10/2026 (como trocar a chave no futuro)
 1. Em https://aistudio.google.com/apikey → **Criar chave de API** → num **projeto novo** (ex.:
    "PetPerdido IA"), **sem faturamento** (plano "Free"). Nunca no `petperdido-ff844`.
 2. No terminal, na pasta do projeto: `firebase functions:secrets:set GEMINI_API_KEY` e cole a chave
