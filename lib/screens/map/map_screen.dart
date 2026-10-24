@@ -11,6 +11,7 @@ import '../../models/post_model.dart';
 import '../../services/location_service.dart';
 import '../../services/post_service.dart';
 import '../../widgets/filtros_sheet.dart';
+import '../../widgets/icones_mapa.dart';
 import '../../widgets/pet_image.dart';
 import '../feed/detail_screen.dart';
 
@@ -47,6 +48,10 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     _postsStream = PostService.postsStream();
+    // Pinos coloridos: redesenha os marcadores quando ficarem prontos.
+    IconesMapa.carregar().then((_) {
+      if (mounted) setState(() {});
+    });
     LocationService.posicaoConhecida.addListener(_aoMudarPosicao);
     _aoMudarPosicao(); // posição que outra tela já tenha obtido
     LocationService.posicaoSemPedir(); // só se a permissão já foi dada
@@ -137,26 +142,24 @@ class _MapScreenState extends State<MapScreen> {
         Marker(
           markerId: MarkerId(post.id),
           position: LatLng(post.latitude, post.longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(_matiz(post.type)),
+          // Pino na cor da legenda (desenhado pelo app: a Web ignora a cor
+          // dos pinos padrão).
+          icon: IconesMapa.doTipo(post.type),
           alpha: post.isResolved ? 0.5 : 1,
           onTap: () => _abrirResumo(post),
         ),
-      // Na Web o mapa não desenha o ponto azul nativo: usa um marcador azul.
+      // Na Web o mapa não desenha o ponto azul nativo: usa um ponto azul.
       if (kIsWeb && _minhaPosicao != null)
         Marker(
           markerId: const MarkerId('minha-posicao'),
           position: _minhaPosicao!,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          icon: IconesMapa.euEstouAqui,
+          anchor: IconesMapa.ancoraEuEstouAqui,
+          zIndexInt: -1,
           infoWindow: const InfoWindow(title: 'Você está aqui'),
         ),
     };
   }
-
-  double _matiz(PostType tipo) => switch (tipo) {
-        PostType.lost => BitmapDescriptor.hueRed,
-        PostType.found => BitmapDescriptor.hueGreen,
-        PostType.sighted => BitmapDescriptor.hueOrange,
-      };
 
   void _abrirResumo(PostModel post) {
     showModalBottomSheet(
