@@ -3,12 +3,35 @@
 > Arquivo de acompanhamento. Para continuar numa sessão nova: "leia o PROGRESSO.md e continue".
 
 Branch: `refactor/modulo-0-limpeza` (enviada ao GitHub, sem merge). Prazo: 28/10/2026.
-Última atualização: 16/10/2026 (pacote de correções de UX e bugs).
+Última atualização: 23/10/2026 (notificação rica, localização no app, aviso dos perdidos, pinos).
+
+## ▶ PRÓXIMO PASSO (combinado em 23/10/2026): notificação PUSH no celular
+
+A notificação tem que chegar **no celular da pessoa, como notificação do sistema** (barra de
+notificações, com a foto), e não só dentro do app (sino/banner).
+
+- **Pronto e commitado** (`fe5ea65`), mas a Function **ainda não foi publicada**:
+  - `alertarProximos` com a mensagem rica (foto, onde/quando/distância, porte/raça/características,
+    começo da descrição) e o **modo de teste** `ALERTAS_PARA_TODOS=true` em `functions/.env` (todo post
+    novo avisa todos os usuários, inclusive o autor);
+  - push no navegador: `web/firebase-messaging-sw.js` + `AlertaService` na Web — **o site já está
+    publicado com esse código**.
+- **Falta:**
+  1. Autorização do usuário para `firebase deploy --only functions` (pedir antes).
+  2. Teste no celular: abrir https://petperdido-ff844.web.app, recarregar, "Ativar alertas" (ou
+     Configurações → Receber alertas), permitir notificações, criar um post com foto → deve chegar a
+     notificação **na barra do celular**, com a foto (com o site fechado ou em segundo plano).
+  3. Se não chegar: conferir `users/{uid}.fcmToken` salvo, o log da Function ("N push enviados" /
+     "Push para … falhou: <código>") e o registro do service worker no navegador. Alternativa:
+     instalar o app Android (o APK completo deu "erro ao analisar o pacote" no celular — tentar o
+     `app-arm64-v8a-debug.apk` por cabo USB; o build release não compila no PC por causa do TLS com
+     `dl.google.com`).
+  4. Depois dos testes: voltar `ALERTAS_PARA_TODOS=false` e publicar a Function de novo.
 
 ## Estado atual (resumo)
 
-**Todo o código das 7 fases está pronto e commitado.** `flutter analyze` sem avisos, 166 testes
-Flutter + 9 testes da Cloud Function passando, `flutter build apk --debug` compilando. Regras do
+**Todo o código das 7 fases está pronto e commitado.** `flutter analyze` sem avisos, 176 testes
+Flutter + 24 testes das Cloud Functions passando, `flutter build apk --debug` compilando. Regras do
 Firestore e do Storage publicadas e validadas por REST (inclusive a de avistamento não vazio).
 
 | Fase | Módulo | Situação |
