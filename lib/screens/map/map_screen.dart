@@ -4,6 +4,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../core/app_colors.dart';
 import '../../core/app_constants.dart';
 import '../../core/app_routes.dart';
+import '../../core/geo.dart';
 import '../../core/post_type_style.dart';
 import '../../models/post_filter.dart';
 import '../../models/post_model.dart';
@@ -59,7 +60,7 @@ class _MapScreenState extends State<MapScreen> {
     final pos = await LocationService.posicaoSemPedir();
     if (pos == null || !mounted) return;
     setState(() => _minhaPosicao = LatLng(pos.lat, pos.lng));
-    _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_minhaPosicao!, 14));
+    _moverCamera(CameraUpdate.newLatLngZoom(_minhaPosicao!, 14));
   }
 
   /// Botão "Minha localização": pede permissão se precisar e centraliza.
@@ -69,8 +70,7 @@ class _MapScreenState extends State<MapScreen> {
       final pos = await LocationService.posicaoAtual();
       if (!mounted) return;
       setState(() => _minhaPosicao = LatLng(pos.lat, pos.lng));
-      _mapController
-          ?.animateCamera(CameraUpdate.newLatLngZoom(_minhaPosicao!, 15));
+      _moverCamera(CameraUpdate.newLatLngZoom(_minhaPosicao!, 15));
     } on LocationException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -93,6 +93,31 @@ class _MapScreenState extends State<MapScreen> {
 
   void _alternarCamada() => setState(() => _camada =
       _camada == MapType.normal ? MapType.hybrid : MapType.normal);
+
+  /// Move a câmera sem deixar escapar erro do mapa (a chamada não é esperada).
+  Future<void> _moverCamera(CameraUpdate destino) async {
+    try {
+      await _mapController?.animateCamera(destino);
+    } catch (e) {
+      debugPrint('MapScreen: não moveu a câmera: $e');
+    }
+  }
+
+  /// Toque no aviso "Há N pets perdidos na região": mostra só os perdidos e
+  /// enquadra o mapa neles (marcadores tocáveis para ver o resumo).
+  void _mostrarPerdidos(List<PostModel> perdidos) {
+    if (perdidos.isEmpty) return;
+    setState(() => _filtro = _filtro.copyWith(tipos: {PostType.lost}));
+    final l = Geo.limites(
+        [for (final p in perdidos) (lat: p.latitude, lng: p.longitude)])!;
+    _moverCamera(CameraUpdate.newLatLngBounds(
+      LatLngBounds(
+        southwest: LatLng(l.sul, l.oeste),
+        northeast: LatLng(l.norte, l.leste),
+      ),
+      72,
+    ));
+  }
 
   Set<Marker> _marcadores(List<PostModel> posts) {
     return {
@@ -142,7 +167,7 @@ class _MapScreenState extends State<MapScreen> {
               todos.where((p) => _filtro.aceita(p, agora: agora)).toList();
           final perdidos = visiveis
               .where((p) => p.type == PostType.lost && !p.isResolved)
-              .length;
+              .toList();
           final carregando = !snapshot.hasData && !snapshot.hasError;
 
           return Stack(
@@ -178,66 +203,96 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _bannerAlerta(int perdidos, bool carregando, {required bool vazio}) {
+  /// Aviso do topo. Com pets perdidos, é tocável: leva até eles no mapa.
+  Widget _bannerAlerta(List<PostModel> perdidos, bool carregando,
+      {required bool vazio}) {
+    final n = perdidos.length;
     final texto = carregando
         ? 'Carregando posts...'
         : vazio
             ? 'Nenhum post com esses filtros.'
-            : 'Há $perdidos pet${perdidos != 1 ? 's' : ''} '
-                'perdido${perdidos != 1 ? 's' : ''} na região!';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, Color(0xFFFF5722)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+            : 'Há $n pet${n != 1 ? 's' : ''} '
+                'perdido${n != 1 ? 's' : ''} na região!';
+    final tocavel = !carregando && n > 0;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          carregando
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
-                )
-              : const Icon(Icons.notifications_active,
-                  color: Colors.white, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              texto,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
+        onTap: tocavel ? () => _mostrarPerdidos(perdidos) : null,
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppColors.primary, Color(0xFFFF5722)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          if (_filtro.quantidadeAtivos > 0)
-            GestureDetector(
-              onTap: () => setState(() => _filtro = const PostFilter()),
-              child: const Text(
-                'Limpar filtros',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  decoration: TextDecoration.underline,
-                  decorationColor: Colors.white,
+          child: Row(
+            children: [
+              carregando
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.notifications_active,
+                      color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      texto,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    if (tocavel)
+                      Text(
+                        n == 1
+                            ? 'Toque para ver no mapa'
+                            : 'Toque para ver os $n no mapa',
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 11),
+                      ),
+                  ],
                 ),
               ),
-            ),
-        ],
+              if (_filtro.quantidadeAtivos > 0)
+                GestureDetector(
+                  onTap: () => setState(() => _filtro = const PostFilter()),
+                  child: const Padding(
+                    padding: EdgeInsets.only(left: 8),
+                    child: Text(
+                      'Limpar filtros',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                )
+              else if (tocavel)
+                const Icon(Icons.chevron_right, color: Colors.white),
+            ],
+          ),
+        ),
       ),
     );
   }

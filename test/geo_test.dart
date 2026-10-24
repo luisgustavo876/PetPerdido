@@ -28,4 +28,30 @@ void main() {
           closeTo(0.111, 0.002));
     });
   });
+
+  group('Geo.limites (enquadrar o mapa)', () {
+    test('lista vazia: null', () {
+      expect(Geo.limites(const []), isNull);
+    });
+
+    test('contém todos os pontos', () {
+      final l = Geo.limites(const [
+        (lat: -23.60, lng: -48.06),
+        (lat: -23.58, lng: -48.04),
+        (lat: -23.59, lng: -48.07),
+      ])!;
+      expect(l.sul, -23.60);
+      expect(l.norte, -23.58);
+      expect(l.oeste, -48.07);
+      expect(l.leste, -48.04);
+    });
+
+    test('um ponto só: abre um vão mínimo centrado nele', () {
+      final l = Geo.limites(const [(lat: -23.59, lng: -48.05)])!;
+      expect(l.norte - l.sul, closeTo(0.005, 1e-9));
+      expect(l.leste - l.oeste, closeTo(0.005, 1e-9));
+      expect((l.norte + l.sul) / 2, closeTo(-23.59, 1e-9));
+      expect((l.leste + l.oeste) / 2, closeTo(-48.05, 1e-9));
+    });
+  });
 }
