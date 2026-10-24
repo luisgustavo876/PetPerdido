@@ -3,6 +3,7 @@ import '../core/app_colors.dart';
 import '../models/notificacao_model.dart';
 import '../services/alerta_service.dart';
 import '../services/user_service.dart';
+import '../widgets/pedido_localizacao.dart';
 import 'alerts/alertas_screen.dart';
 import 'chat/chats_screen.dart';
 import 'feed/feed_screen.dart';
@@ -37,8 +38,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.initState();
     _notificacoesStream = UserService.notificacoesStream();
     WidgetsBinding.instance.addObserver(this);
-    // Depois do primeiro quadro: o aviso de LGPD precisa da tela montada.
-    WidgetsBinding.instance.addPostFrameCallback((_) => AlertaService.iniciar());
+    // Depois do primeiro quadro (os avisos precisam da tela montada):
+    // 1) pede a localização se ainda não foi liberada (toda vez que o app
+    //    abre); 2) aviso de LGPD dos alertas.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await PedidoLocalizacao.verificar();
+      await AlertaService.iniciar();
+    });
   }
 
   @override

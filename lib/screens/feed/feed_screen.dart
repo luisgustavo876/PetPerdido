@@ -40,11 +40,16 @@ class _FeedScreenState extends State<FeedScreen> {
   void initState() {
     super.initState();
     _postsStream = PostService.postsStream();
-    _posicaoSemPedir();
+    // Distâncias nos cards: usa a posição conhecida e se atualiza quando o
+    // usuário libera a localização (no pedido do app ou em outra tela).
+    LocationService.posicaoConhecida.addListener(_aoMudarPosicao);
+    _aoMudarPosicao();
+    LocationService.posicaoSemPedir();
   }
 
   @override
   void dispose() {
+    LocationService.posicaoConhecida.removeListener(_aoMudarPosicao);
     _buscaController.dispose();
     super.dispose();
   }
@@ -52,9 +57,8 @@ class _FeedScreenState extends State<FeedScreen> {
   void _tentarDeNovo() =>
       setState(() => _postsStream = PostService.postsStream());
 
-  /// Distâncias nos cards, se o usuário já tiver dado permissão de localização.
-  Future<void> _posicaoSemPedir() async {
-    final pos = await LocationService.posicaoSemPedir();
+  void _aoMudarPosicao() {
+    final pos = LocationService.posicaoConhecida.value;
     if (pos != null && mounted) setState(() => _minhaPosicao = pos);
   }
 

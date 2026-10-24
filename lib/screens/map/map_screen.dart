@@ -39,15 +39,22 @@ class _MapScreenState extends State<MapScreen> {
   LatLng? _minhaPosicao;
   bool _localizando = false;
 
+  /// A câmera já foi para a posição do usuário (automaticamente ou pelo
+  /// botão). Depois disso, novas posições só movem o marcador azul.
+  bool _jaCentralizou = false;
+
   @override
   void initState() {
     super.initState();
     _postsStream = PostService.postsStream();
-    _centralizarSemPedir();
+    LocationService.posicaoConhecida.addListener(_aoMudarPosicao);
+    _aoMudarPosicao(); // posição que outra tela já tenha obtido
+    LocationService.posicaoSemPedir(); // só se a permissão já foi dada
   }
 
   @override
   void dispose() {
+    LocationService.posicaoConhecida.removeListener(_aoMudarPosicao);
     _mapController?.dispose();
     super.dispose();
   }
@@ -55,16 +62,21 @@ class _MapScreenState extends State<MapScreen> {
   void _tentarDeNovo() =>
       setState(() => _postsStream = PostService.postsStream());
 
-  /// Câmera inicial: posição do usuário, se ele já deu permissão antes.
-  Future<void> _centralizarSemPedir() async {
-    final pos = await LocationService.posicaoSemPedir();
+  /// Chegou uma posição do usuário (inclusive logo depois de ele liberar a
+  /// localização no pedido do app): centraliza na primeira vez.
+  void _aoMudarPosicao() {
+    final pos = LocationService.posicaoConhecida.value;
     if (pos == null || !mounted) return;
     setState(() => _minhaPosicao = LatLng(pos.lat, pos.lng));
-    _moverCamera(CameraUpdate.newLatLngZoom(_minhaPosicao!, 14));
+    if (!_jaCentralizou) {
+      _jaCentralizou = true;
+      _moverCamera(CameraUpdate.newLatLngZoom(_minhaPosicao!, 14));
+    }
   }
 
   /// Botão "Minha localização": pede permissão se precisar e centraliza.
   Future<void> _irParaMinhaLocalizacao() async {
+    _jaCentralizou = true; // o próprio botão move a câmera (zoom 15)
     setState(() => _localizando = true);
     try {
       final pos = await LocationService.posicaoAtual();

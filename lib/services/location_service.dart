@@ -1,11 +1,30 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' show Locale;
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/foundation.dart' show ValueNotifier, debugPrint, kIsWeb;
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import '../core/app_constants.dart';
+
+/// Situação da permissão de localização (para o pedido dentro do app).
+enum EstadoLocalizacao {
+  /// Permissão dada: dá para usar a localização.
+  liberada,
+
+  /// Ainda não deu (ou negou uma vez): dá para pedir de novo.
+  naoLiberada,
+
+  /// Bloqueada ("não perguntar de novo" / bloqueio no navegador): só nas
+  /// configurações do aparelho ou no cadeado do navegador.
+  bloqueada,
+
+  /// GPS do aparelho desligado (Android).
+  gpsDesligado,
+
+  /// Não foi possível saber (plataforma sem suporte, erro do plugin).
+  indisponivel,
+}
 
 /// Erro de localização com mensagem pronta para mostrar ao usuário.
 class LocationException implements Exception {
@@ -37,12 +56,40 @@ class LocationService {
     return (valor * fator).round() / fator;
   }
 
+  /// Última posição obtida neste aparelho. O mapa e o feed escutam: se a
+  /// permissão for dada depois que a tela abriu, eles se atualizam sozinhos.
+  static final posicaoConhecida =
+      ValueNotifier<({double lat, double lng})?>(null);
+
+  /// Situação da permissão, sem pedir nada ao usuário. Nunca lança erro.
+  static Future<EstadoLocalizacao> estadoPermissao() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        return EstadoLocalizacao.gpsDesligado;
+      }
+      return switch (await Geolocator.checkPermission()) {
+        LocationPermission.always ||
+        LocationPermission.whileInUse =>
+          EstadoLocalizacao.liberada,
+        LocationPermission.deniedForever => EstadoLocalizacao.bloqueada,
+        LocationPermission.denied ||
+        LocationPermission.unableToDetermine =>
+          EstadoLocalizacao.naoLiberada,
+      };
+    } catch (e) {
+      debugPrint('LocationService: não deu para ver a permissão: $e');
+      return EstadoLocalizacao.indisponivel;
+    }
+  }
+
   /// Posição atual do aparelho. Pede permissão se precisar.
   /// Lança [LocationException] com o motivo se não conseguir — inclusive em
   /// falhas inesperadas do plugin (nunca deixa escapar outro tipo de erro).
   static Future<({double lat, double lng})> posicaoAtual() async {
     try {
-      return await _posicaoAtual();
+      final pos = await _posicaoAtual();
+      posicaoConhecida.value = pos;
+      return pos;
     } on LocationException {
       rethrow;
     } catch (e) {
@@ -100,7 +147,9 @@ class LocationService {
           timeLimit: Duration(seconds: 10),
         ),
       );
-      return (lat: p.latitude, lng: p.longitude);
+      final pos = (lat: p.latitude, lng: p.longitude);
+      posicaoConhecida.value = pos;
+      return pos;
     } catch (_) {
       return null;
     }

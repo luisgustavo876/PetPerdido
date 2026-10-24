@@ -121,6 +121,11 @@ void main() {
   group('LocationService.posicaoAtual', () {
     TestWidgetsFlutterBinding.ensureInitialized();
 
+    test('estadoPermissao sem plugin: "indisponível", sem lançar erro', () async {
+      expect(await LocationService.estadoPermissao(),
+          EstadoLocalizacao.indisponivel);
+    });
+
     test('plugin ausente (MissingPluginException) vira LocationException', () async {
       // No teste não há plugin nativo: é o mesmo cenário do build da Web que
       // ficou sem o geolocator registrado. Antes, o erro escapava sem tratamento.
