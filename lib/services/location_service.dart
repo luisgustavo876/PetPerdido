@@ -38,8 +38,21 @@ class LocationService {
   }
 
   /// Posição atual do aparelho. Pede permissão se precisar.
-  /// Lança [LocationException] com o motivo se não conseguir.
+  /// Lança [LocationException] com o motivo se não conseguir — inclusive em
+  /// falhas inesperadas do plugin (nunca deixa escapar outro tipo de erro).
   static Future<({double lat, double lng})> posicaoAtual() async {
+    try {
+      return await _posicaoAtual();
+    } on LocationException {
+      rethrow;
+    } catch (e) {
+      debugPrint('LocationService: falha inesperada na localização: $e');
+      throw const LocationException(
+          'Não foi possível usar sua localização. Toque no mapa para marcar o ponto.');
+    }
+  }
+
+  static Future<({double lat, double lng})> _posicaoAtual() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw const LocationException('Ative a localização (GPS) do aparelho.');
     }
@@ -52,8 +65,10 @@ class LocationService {
       throw const LocationException('Permissão de localização negada.');
     }
     if (permissao == LocationPermission.deniedForever) {
-      throw const LocationException(
-          'Permissão de localização bloqueada. Libere nas configurações do aparelho.');
+      throw LocationException(kIsWeb
+          ? 'Localização bloqueada no navegador. Libere no cadeado ao lado do '
+              'endereço do site e tente de novo.'
+          : 'Permissão de localização bloqueada. Libere nas configurações do aparelho.');
     }
 
     try {

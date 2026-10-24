@@ -117,4 +117,18 @@ void main() {
       expect(LocationService.formatarBairroCidade(null, null), isNull);
     });
   });
+
+  group('LocationService.posicaoAtual', () {
+    TestWidgetsFlutterBinding.ensureInitialized();
+
+    test('plugin ausente (MissingPluginException) vira LocationException', () async {
+      // No teste não há plugin nativo: é o mesmo cenário do build da Web que
+      // ficou sem o geolocator registrado. Antes, o erro escapava sem tratamento.
+      await expectLater(
+        LocationService.posicaoAtual(),
+        throwsA(isA<LocationException>().having(
+            (e) => e.message, 'mensagem', contains('Toque no mapa'))),
+      );
+    });
+  });
 }

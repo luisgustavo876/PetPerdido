@@ -137,6 +137,13 @@ com fotos. Domínio já autorizado no Firebase Auth. Para atualizar: `flutter bu
 - Regras: publico com `firebase deploy --only firestore:rules` (após `--dry-run`) e valido logo em
   seguida por REST com 2 usuários de teste; tudo é apagado no fim.
 - Build Android: se aparecer `mergeExtDexDebug` falhando, rodar de novo (erro passageiro do Gradle).
+- **Build Web — cache velho (23/10/2026):** o `flutter build web --release` reaproveitou um cache de
+  25/05 em `.dart_tool/flutter_build/<hash>/` com a lista de plugins antiga (sem geolocator,
+  share_plus, url_launcher, firebase_messaging). No site, "Usar minha localização" dava
+  `MissingPluginException`. Correção: apagar a pasta do cache (ou `flutter clean`) e gerar de novo.
+  Para conferir antes de publicar: `.dart_tool/flutter_build/*/web_plugin_registrant.dart` precisa ter
+  `GeolocatorPlugin` e `SharePlusWebPlugin`. O `LocationService.posicaoAtual` agora converte qualquer
+  falha inesperada em `LocationException` (mensagem na tela em vez de erro solto).
 - **IA — de AI Logic para Cloud Function (23/10/2026):** o projeto está no Blaze (exigido pela
   Function de alertas), então a Gemini API dele saiu do nível gratuito e passou a usar créditos
   pré-pagos, que acabaram (erro 429 "prepayment credits are depleted"). O nível gratuito só vale para
