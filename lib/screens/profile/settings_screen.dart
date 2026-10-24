@@ -108,8 +108,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _salvandoAlertas = true);
     try {
       if (ligar) {
+        // Pede as permissões já no toque (o navegador exige um toque recente).
+        final permissoes = AlertaService.atualizar(pedirPermissao: true);
         await UserService.definirAlertas(ativo: true);
-        await AlertaService.atualizar(pedirPermissao: true);
+        await permissoes;
       } else {
         await UserService.desligarAlertas();
       }
@@ -307,11 +309,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       SwitchListTile(
         title: const Text('Receber alertas'),
         subtitle: Text(kIsWeb
-            ? 'Disponível no app de celular (Android).'
+            ? 'Notificação no navegador quando um pet some, é achado ou visto '
+                'perto de você (no iPhone, só com o site na tela de início).'
             : 'Aviso quando um pet some, é achado ou visto perto de você.'),
         value: p.alertasAtivos,
         activeThumbColor: AppColors.primary,
-        onChanged: kIsWeb || _salvandoAlertas ? null : _alternarAlertas,
+        onChanged: _salvandoAlertas ? null : _alternarAlertas,
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

@@ -39,9 +39,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _notificacoesStream = UserService.notificacoesStream();
     WidgetsBinding.instance.addObserver(this);
     // Depois do primeiro quadro (os avisos precisam da tela montada):
+    // 0) veio do toque numa notificação no navegador? abre o post;
     // 1) pede a localização se ainda não foi liberada (toda vez que o app
     //    abre); 2) aviso de LGPD dos alertas.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      AlertaService.abrirPostDaUrl();
       await PedidoLocalizacao.verificar();
       await AlertaService.iniciar();
     });

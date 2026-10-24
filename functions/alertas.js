@@ -10,11 +10,21 @@ const RAIO_MAXIMO_KM = 10;
 const RAIOS_PERMITIDOS = [1, 3, 5, 10];
 const RAIO_PADRAO_KM = 3;
 
-const TITULOS = {
-  perdi: "Pet perdido perto de você",
-  achei: "Pet encontrado perto de você",
-  avistei: "Pet avistado perto de você",
+/** Como cada tipo aparece na notificação. */
+const TIPOS = {
+  perdi: {emoji: "🚨", rotulo: "PERDIDO", quando: "sumiu"},
+  achei: {emoji: "🏠", rotulo: "ENCONTRADO", quando: "encontrado"},
+  avistei: {emoji: "👀", rotulo: "AVISTADO", quando: "visto"},
 };
+
+/** Raças que não ajudam a reconhecer o pet (ficam fora da notificação). */
+const RACAS_GENERICAS = ["sem raça definida", "desconhecida", ""];
+
+/** Tamanho máximo do trecho da descrição na notificação. */
+const MAX_TRECHO = 100;
+
+/** Fuso das datas mostradas (o servidor roda em UTC). */
+const FUSO = "America/Sao_Paulo";
 
 /** Distância em linha reta entre dois pontos, em km (Haversine). */
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -35,45 +45,156 @@ function raioDoUsuario(usuario) {
 
 /**
  * Quem deve ser avisado sobre o post.
- * Exclui o autor, quem desligou os alertas (alertsEnabled === false), quem
- * não tem localização e quem está além do próprio raio.
- * @return {Array<{uid: string, token: (string|null), distanciaKm: number}>}
+ *
+ * Normal: exclui o autor, quem desligou os alertas (alertsEnabled === false),
+ * quem não tem localização e quem está além do próprio raio.
+ * Com [paraTodos] (modo de teste): todos os usuários, inclusive o autor e
+ * quem está longe; a distância vem quando o usuário tem localização.
+ * @return {Array<{uid: string, token: (string|null),
+ *   distanciaKm: (number|null)}>}
  */
-function escolherDestinatarios(post, usuarios) {
+function escolherDestinatarios(post, usuarios, {paraTodos = false} = {}) {
   const saida = [];
   for (const u of usuarios) {
-    if (u.uid === post.userId) continue;
-    if (u.alertsEnabled === false) continue;
+    const token = typeof u.fcmToken === "string" && u.fcmToken ?
+      u.fcmToken : null;
     const loc = u.lastLocation;
-    if (!loc || typeof loc.lat !== "number" || typeof loc.lng !== "number") {
+    const temLocal = !!loc && typeof loc.lat === "number" &&
+      typeof loc.lng === "number";
+    const km = temLocal ?
+      distanciaKm(post.latitude, post.longitude, loc.lat, loc.lng) :
+      null;
+
+    if (paraTodos) {
+      saida.push({uid: u.uid, token, distanciaKm: km});
       continue;
     }
-    const km = distanciaKm(post.latitude, post.longitude, loc.lat, loc.lng);
-    if (km > raioDoUsuario(u)) continue;
-    saida.push({
-      uid: u.uid,
-      token: typeof u.fcmToken === "string" && u.fcmToken ? u.fcmToken : null,
-      distanciaKm: km,
-    });
+    if (u.uid === post.userId) continue;
+    if (u.alertsEnabled === false) continue;
+    if (km === null || km > raioDoUsuario(u)) continue;
+    saida.push({uid: u.uid, token, distanciaKm: km});
   }
   return saida;
 }
 
+/** Date a partir de Timestamp do Firestore, Date ou texto ISO (ou null). */
+function paraData(valor) {
+  if (!valor) return null;
+  if (valor instanceof Date) return isNaN(valor) ? null : valor;
+  if (typeof valor.toDate === "function") return valor.toDate();
+  if (typeof valor === "string") {
+    const d = new Date(valor);
+    return isNaN(d) ? null : d;
+  }
+  return null;
+}
+
+/** Dia (aaaa-mm-dd), "dd/mm" e "hh:mm" de uma data no fuso de Brasília. */
+function partesNoFuso(data) {
+  const f = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: FUSO, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  });
+  const p = Object.fromEntries(f.formatToParts(data).map((x) => [x.type, x.value]));
+  return {
+    dia: `${p.year}-${p.month}-${p.day}`,
+    ddmm: `${p.day}/${p.month}`,
+    hora: `${p.hour}:${p.minute}`,
+  };
+}
+
+/** "hoje às 09:00", "ontem às 18:30" ou "12/10 às 14:00" (Brasília). */
+function quandoTexto(data, agora) {
+  if (!data) return null;
+  const d = partesNoFuso(data);
+  if (d.dia === partesNoFuso(agora).dia) return `hoje às ${d.hora}`;
+  const ontem = new Date(agora.getTime() - 24 * 60 * 60 * 1000);
+  if (d.dia === partesNoFuso(ontem).dia) return `ontem às ${d.hora}`;
+  return `${d.ddmm} às ${d.hora}`;
+}
+
+/** "a ~300 m de você" ou "a 1,2 km de você" (coordenadas são de ~100 m). */
+function distanciaTexto(km) {
+  if (typeof km !== "number" || !isFinite(km)) return null;
+  if (km < 1) return `a ~${Math.max(100, Math.round(km * 10) * 100)} m de você`;
+  const valor = km < 10 ? km.toFixed(1).replace(".", ",") : String(Math.round(km));
+  return `a ${valor} km de você`;
+}
+
+/** Começo da descrição, cortado numa palavra, com reticências. */
+function trecho(texto, max = MAX_TRECHO) {
+  const limpo = String(texto || "").replace(/\s+/g, " ").trim();
+  if (limpo.length <= max) return limpo;
+  const corte = limpo.slice(0, max);
+  const espaco = corte.lastIndexOf(" ");
+  return `${(espaco > max / 2 ? corte.slice(0, espaco) : corte).replace(/[\s,.;:]+$/, "")}…`;
+}
+
 /**
- * Título e corpo da notificação: tipo no título; espécie, cor e bairro no
- * corpo. Ex.: "Cão caramelo e branco · Vila Barth, Itapetininga".
+ * Conteúdo da notificação, pensado para dar para saber se a pessoa pode
+ * ajudar sem abrir o app: tipo, nome, espécie e cor no título; onde, quando
+ * e a que distância; porte, raça e características; começo da descrição; e
+ * a foto. Só dados públicos do post (nada de autor, e-mail ou coordenadas).
+ * @return {{titulo: string, corpo: string, imagem: (string|null)}}
  */
-function montarMensagem(post) {
-  const titulo = TITULOS[post.type] || "Pet perto de você";
+function montarMensagem(post, {distanciaKm: km = null, agora = new Date()} = {}) {
+  const tipo = TIPOS[post.type] || {emoji: "🐾", rotulo: "PET", quando: "visto"};
+  const especie = String(post.species || "pet").toLowerCase();
   const cores = Array.isArray(post.colors) ?
-    post.colors.map((c) => String(c).toLowerCase()) :
-    [];
-  const especie = post.species || "Pet";
-  const descricao = cores.length ?
-    `${especie} ${cores.join(" e ")}` :
-    especie;
-  const bairro = post.lastSeenAddress || "sua região";
-  return {titulo, corpo: `${descricao} · ${bairro}`};
+    post.colors.map((c) => String(c).toLowerCase()).join(" e ") :
+    "";
+  const oQue = [especie, cores].filter(Boolean).join(" ");
+  const nome = post.type === "perdi" && post.petName &&
+    post.petName !== "Sem nome" ? post.petName : null;
+  const titulo = `${tipo.emoji} ${tipo.rotulo}: ${nome ? `${nome} · ` : ""}${oQue}`;
+
+  const quando = quandoTexto(paraData(post.eventAt) || paraData(post.createdAt),
+      agora);
+  const linhaOnde = [
+    `📍 ${post.lastSeenAddress || "local não informado"}`,
+    quando ? `${tipo.quando} ${quando}` : null,
+    distanciaTexto(km),
+  ].filter(Boolean).join(" · ");
+
+  const raca = RACAS_GENERICAS.includes(String(post.breed || "").toLowerCase()) ?
+    null : post.breed;
+  const caracteristicas = Array.isArray(post.traits) ? post.traits.slice(0, 3) : [];
+  const linhaPet = [post.size, raca, ...caracteristicas].filter(Boolean).join(" · ");
+
+  const descricao = trecho(post.description);
+  const corpo = [linhaOnde, linhaPet, descricao ? `“${descricao}”` : null]
+      .filter(Boolean).join("\n");
+
+  const imagem = typeof post.photoUrl === "string" &&
+    post.photoUrl.startsWith("https://") ? post.photoUrl : null;
+  return {titulo, corpo, imagem};
+}
+
+/**
+ * Mensagem do FCM para um destinatário (Android e navegador), com a foto e
+ * o link que abre o post no site.
+ */
+function montarPush({token, postId, post, distanciaKm: km = null,
+  agora = new Date(), site}) {
+  const {titulo, corpo, imagem} = montarMensagem(post, {distanciaKm: km, agora});
+  return {
+    token,
+    notification: {title: titulo, body: corpo, ...(imagem ? {imageUrl: imagem} : {})},
+    data: {postId, type: String(post.type), ...(imagem ? {imagem} : {})},
+    android: {
+      priority: "high",
+      notification: {channelId: "alertas_pets", tag: postId},
+    },
+    webpush: {
+      notification: {
+        title: titulo,
+        body: corpo,
+        icon: `${site}/icons/Icon-192.png`,
+        ...(imagem ? {image: imagem} : {}),
+      },
+      fcmOptions: {link: `${site}/?post=${encodeURIComponent(postId)}`},
+    },
+  };
 }
 
 /** Erros do FCM que indicam token que não serve mais (deve ser apagado). */
@@ -101,7 +222,12 @@ module.exports = {
   distanciaKm,
   raioDoUsuario,
   escolherDestinatarios,
+  paraData,
+  quandoTexto,
+  distanciaTexto,
+  trecho,
   montarMensagem,
+  montarPush,
   tokenInvalido,
   emLotes,
 };

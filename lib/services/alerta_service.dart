@@ -6,47 +6,68 @@ import '../core/app_colors.dart';
 import '../core/app_constants.dart';
 import '../core/app_navigation.dart';
 import '../screens/feed/detail_screen.dart';
+import '../widgets/pet_image.dart';
 import 'auth_service.dart';
 import 'location_service.dart';
 import 'post_service.dart';
 import 'user_service.dart';
 
-/// Alertas por proximidade (lado do app).
+/// Alertas por proximidade (lado do app), no Android e no navegador.
 ///
 /// - Antes de pedir a localização, mostra um aviso de LGPD.
 /// - Ao abrir o app e ao voltar do segundo plano (nunca em rastreamento
-///   contínuo), grava a localização aproximada e o token do aparelho em
-///   users/{uid}. A Cloud Function usa esses dados para avisar quem está perto.
+///   contínuo), grava a localização aproximada e o token do aparelho (ou do
+///   navegador) em users/{uid}. A Cloud Function usa esses dados para avisar
+///   quem está perto.
 /// - Trata o toque na notificação (abre o post) e a notificação com o app
-///   aberto (banner dentro do app).
+///   aberto (banner dentro do app, com a foto).
 ///
-/// Push só no Android/iOS: na Web este serviço não faz nada.
+/// Na Web o push usa o service worker `web/firebase-messaging-sw.js`
+/// (Chrome, Edge, Firefox; no iPhone só com o site na tela de início).
 class AlertaService {
   static bool _ouvintesRegistrados = false;
+  static bool _urlTratada = false;
   static DateTime? _ultimaAtualizacao;
 
   /// Chamado uma vez quando a tela principal abre (usuário logado).
   static Future<void> iniciar() async {
-    if (kIsWeb || AuthService.currentUser == null) return;
+    if (AuthService.currentUser == null) return;
     _registrarOuvintes();
     try {
       final prefs = await UserService.preferenciasAlerta();
-      var ativo = prefs.ativo;
-      if (ativo == null) {
-        ativo = await _pedirConsentimento();
-        await UserService.definirAlertas(
-            ativo: ativo, raioKm: AppConstants.alertRadiusPadraoKm);
+      if (prefs.ativo == null) {
+        final aceitou = await _pedirConsentimento();
+        if (aceitou) {
+          // Começa já (o navegador só mostra o pedido de notificação se ele
+          // vier logo depois do toque em "Ativar alertas").
+          final permissoes = atualizar(pedirPermissao: true);
+          await UserService.definirAlertas(
+              ativo: true, raioKm: AppConstants.alertRadiusPadraoKm);
+          await permissoes;
+        } else {
+          await UserService.definirAlertas(
+              ativo: false, raioKm: AppConstants.alertRadiusPadraoKm);
+        }
+      } else if (prefs.ativo == true) {
+        await atualizar();
       }
-      if (ativo) await atualizar(pedirPermissao: prefs.ativo == null);
     } catch (e) {
       debugPrint('AlertaService: falha ao iniciar: $e');
     }
   }
 
+  /// Na Web, o toque na notificação abre o site com `?post=<id>`: abre o post.
+  static void abrirPostDaUrl() {
+    if (!kIsWeb || _urlTratada) return;
+    _urlTratada = true;
+    final postId = Uri.base.queryParameters['post'];
+    if (postId != null && postId.isNotEmpty) abrirPost(postId);
+  }
+
   /// Ao voltar do segundo plano: atualiza se os alertas estão ligados e já
   /// passou [AppConstants.alertaIntervaloAtualizacao] desde a última vez.
   static Future<void> aoVoltarDoSegundoPlano() async {
-    if (kIsWeb || AuthService.currentUser == null) return;
+    if (AuthService.currentUser == null) return;
     final ultima = _ultimaAtualizacao;
     if (ultima != null &&
         DateTime.now().difference(ultima) <
@@ -65,13 +86,21 @@ class AlertaService {
   /// permissões de notificação e localização (só logo depois do aviso LGPD
   /// ou quando o usuário liga os alertas nas Configurações).
   static Future<void> atualizar({bool pedirPermissao = false}) async {
-    if (kIsWeb) return;
     _ultimaAtualizacao = DateTime.now();
 
     final messaging = FirebaseMessaging.instance;
-    if (pedirPermissao) await messaging.requestPermission();
-    final token = await messaging.getToken();
-    if (token != null) await UserService.salvarToken(token);
+    if (pedirPermissao) {
+      // Primeira chamada (sem await antes): conta como resposta ao toque.
+      final permissao = await messaging.requestPermission();
+      if (permissao.authorizationStatus == AuthorizationStatus.denied) {
+        _mostrarAviso(kIsWeb
+            ? 'Notificações bloqueadas no navegador. Libere no cadeado ao lado '
+                'do endereço do site para receber os alertas.'
+            : 'Notificações desativadas. Libere nas configurações do aparelho '
+                'para receber os alertas.');
+      }
+    }
+    await _salvarToken(messaging, avisar: pedirPermissao);
 
     ({double lat, double lng})? pos;
     if (pedirPermissao) {
@@ -91,10 +120,30 @@ class AlertaService {
     }
   }
 
+  /// Token do push deste aparelho/navegador. Nunca lança erro: sem token
+  /// (navegador sem suporte, notificação bloqueada) os alertas continuam no
+  /// sino do app.
+  static Future<void> _salvarToken(FirebaseMessaging messaging,
+      {required bool avisar}) async {
+    try {
+      if (kIsWeb && !await messaging.isSupported()) {
+        if (avisar) {
+          _mostrarAviso('Este navegador não recebe notificações. No iPhone, '
+              'adicione o site à tela de início e abra por lá.');
+        }
+        return;
+      }
+      final token = await messaging.getToken();
+      if (token != null) await UserService.salvarToken(token);
+    } catch (e) {
+      debugPrint('AlertaService: sem token de push: $e');
+    }
+  }
+
   /// Ao sair da conta: este aparelho para de receber os alertas dela.
   static Future<void> sair() async {
     try {
-      if (!kIsWeb) await UserService.salvarToken(null);
+      await UserService.salvarToken(null);
     } catch (_) {
       // Sem internet: segue com o logout mesmo assim.
     }
@@ -150,11 +199,21 @@ class AlertaService {
     final titulo = msg.notification?.title ?? 'Alerta do PetPerdido';
     final corpo = msg.notification?.body ?? '';
     final postId = msg.data['postId'] as String?;
+    final imagem = msg.data['imagem'] as String?;
 
     messenger.clearMaterialBanners();
     messenger.showMaterialBanner(MaterialBanner(
       backgroundColor: AppColors.primarySurface,
-      leading: const Icon(Icons.notifications_active, color: AppColors.primary),
+      leading: imagem == null
+          ? const Icon(Icons.notifications_active, color: AppColors.primary)
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                width: 56,
+                height: 56,
+                child: PetImage(url: imagem, iconSize: 24),
+              ),
+            ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -212,7 +271,8 @@ class AlertaService {
             'Para isso guardamos:\n'
             '• sua localização aproximada (cerca de 100 m), atualizada só '
             'quando você abre o app — não acompanhamos você em segundo plano;\n'
-            '• um código do seu aparelho, para enviar a notificação.\n\n'
+            '• um código deste aparelho (ou navegador), para enviar a '
+            'notificação.\n\n'
             'Esses dados não aparecem para outros usuários e servem só para os '
             'alertas. Você pode desligar quando quiser em Configurações.',
           ),

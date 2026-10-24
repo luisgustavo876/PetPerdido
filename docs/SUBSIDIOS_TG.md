@@ -86,16 +86,27 @@ implementado** (outubro de 2026). Cada seção pode ser adaptada para o capítul
    (~100 m) e gravada em `users/{uid}.lastLocation` com o **geohash**, junto com o `fcmToken`.
 3. **Novo post:** o gatilho `onDocumentCreated(posts/{id})` da Cloud Function calcula as faixas de
    geohash que cobrem um círculo de **10 km** (maior raio possível) com `geohashQueryBounds` e
-   consulta `users` por `lastLocation.geohash` (índice simples).
+   consulta `users` por `lastLocation.geohash` (índice simples). A consulta lê **só** os campos dos
+   alertas (`select`: token, localização, preferências) — nunca CPF, e-mail ou nome.
 4. **Filtro exato:** para cada candidato, calcula a distância (Haversine) e mantém só quem está
    dentro do **próprio raio** (1, 3, 5 ou 10 km), excluindo o autor e quem desligou os alertas.
-5. **Envio:** grava `users/{uid}/notifications` (sino do app) e envia o push com
-   `sendEachForMulticast` (lotes de 500). Tokens inválidos são apagados.
+5. **Envio:** grava `users/{uid}/notifications` (sino do app, com a foto) e envia um push por pessoa
+   com `sendEach` (lotes de 500), já com a distância de cada um. Tokens inválidos são apagados.
 6. **No aparelho:** com o app fechado, a notificação aparece na barra (canal `alertas_pets`, prioridade
-   alta) e o toque abre o post; com o app aberto, aparece um banner interno.
+   alta) com a **foto do pet**, e o toque abre o post; com o app aberto, aparece um banner interno.
+   No navegador (Chrome/Edge/Firefox), o service worker `firebase-messaging-sw.js` mostra a
+   notificação com a foto e o toque abre o site já no post (`?post=<id>`).
 
-Título conforme o tipo: "Pet perdido / encontrado / avistado perto de você". Corpo: espécie, cor e
-bairro (ex.: "Cão caramelo e branco · Vila Barth, Itapetininga").
+**Notificação rica** — para a pessoa saber se pode ajudar sem abrir o app (só dados públicos do post):
+- título: tipo, nome (se for "Perdi") e espécie com cor — "🚨 PERDIDO: Pipoca · cão caramelo";
+- 1ª linha: bairro, quando (horário de Brasília, "hoje/ontem") e distância — "📍 Vila Barth ·
+  sumiu hoje às 09:00 · a 1,2 km de você";
+- 2ª linha: porte, raça e até 3 características; 3ª linha: começo da descrição (até 100 caracteres);
+- imagem: a foto do post.
+
+**Modo de teste** (`functions/.env`, `ALERTAS_PARA_TODOS=true`): todo post novo avisa **todos** os
+usuários, inclusive o autor, sem olhar a distância — usado para testar a notificação. Em produção,
+`false` volta ao geofencing.
 
 ## 5. Fluxo da IA (extração de metadados com Gemini)
 

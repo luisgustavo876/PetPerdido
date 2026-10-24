@@ -4,6 +4,7 @@ import '../../core/formatters.dart';
 import '../../models/notificacao_model.dart';
 import '../../services/alerta_service.dart';
 import '../../services/user_service.dart';
+import '../../widgets/pet_image.dart';
 
 /// Lista de alertas recebidos (users/{uid}/notifications).
 class AlertasScreen extends StatefulWidget {
@@ -73,35 +74,65 @@ class _AlertasScreenState extends State<AlertasScreen> {
       return _estado(
         Icons.notifications_none,
         'Nenhum alerta por enquanto.\nQuando sair um post perto de você, '
-        'ele aparece aqui.',
+        'ele aparece aqui, com a foto do pet.',
       );
     }
     return ListView.separated(
       itemCount: lista.length,
       separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, i) {
-        final n = lista[i];
-        return ListTile(
-          onTap: () => _abrir(n),
-          tileColor: n.lida ? null : AppColors.primarySurface,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: CircleAvatar(
-            backgroundColor: n.lida ? AppColors.background : AppColors.primary,
-            child: Icon(Icons.pets,
-                color: n.lida ? AppColors.textTertiary : Colors.white, size: 20),
-          ),
-          title: Text(
-            n.titulo,
-            style: TextStyle(
-                fontWeight: n.lida ? FontWeight.w500 : FontWeight.w800),
-          ),
-          subtitle: Text('${n.corpo}\n'
-              '${Formatters.tempoRelativo(n.createdAt, DateTime.now())}'),
-          isThreeLine: true,
-          trailing: const Icon(Icons.chevron_right, color: AppColors.textTertiary),
-        );
-      },
+      itemBuilder: (context, i) => _item(lista[i]),
+    );
+  }
+
+  /// Alerta com a foto do pet e o texto completo (onde, quando, como é).
+  Widget _item(NotificacaoModel n) {
+    return InkWell(
+      onTap: () => _abrir(n),
+      child: Container(
+        color: n.lida ? null : AppColors.primarySurface,
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 64,
+                height: 64,
+                child: ColoredBox(
+                  color: AppColors.background,
+                  child: PetImage(url: n.imagem, iconSize: 28),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    n.titulo,
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: n.lida ? FontWeight.w600 : FontWeight.w800),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(n.corpo,
+                      style: const TextStyle(
+                          fontSize: 13, height: 1.35, color: AppColors.onSurface)),
+                  const SizedBox(height: 4),
+                  Text(
+                    Formatters.tempoRelativo(n.createdAt, DateTime.now()),
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textTertiary),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppColors.textTertiary),
+          ],
+        ),
+      ),
     );
   }
 

@@ -22,6 +22,7 @@ const {
   RAIO_MAXIMO_KM,
   escolherDestinatarios,
   montarMensagem,
+  montarPush,
   tokenInvalido,
   emLotes,
 } = require("./alertas");
@@ -37,6 +38,18 @@ const {
 // `firebase functions:secrets:set GEMINI_API_KEY`.
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 
+// Modo de teste dos alertas (functions/.env): true = todo post novo avisa
+// TODOS os usuários, inclusive o autor, sem olhar a distância.
+const ALERTAS_PARA_TODOS = process.env.ALERTAS_PARA_TODOS === "true";
+
+// Site publicado (link da notificação no navegador).
+const PROJETO = process.env.GCLOUD_PROJECT ||
+  JSON.parse(process.env.FIREBASE_CONFIG || "{}").projectId;
+const SITE = `https://${PROJETO}.web.app`;
+
+// Só o que os alertas usam de users/{uid} (nada de CPF, e-mail ou nome).
+const CAMPOS_ALERTA = ["fcmToken", "lastLocation", "alertsEnabled", "alertRadiusKm"];
+
 initializeApp();
 
 // Mesma região do banco Firestore (São Paulo).
@@ -50,39 +63,49 @@ exports.alertarProximos = onDocumentCreated("posts/{postId}", async (event) => {
   }
   const postId = event.params.postId;
   const db = getFirestore();
+  const agora = new Date();
 
-  // 1) Candidatos: usuários cuja última localização está a até 10 km
-  //    (consulta por faixas de geohash, sem índice composto).
-  const faixas = geohashQueryBounds(
-      [post.latitude, post.longitude], RAIO_MAXIMO_KM * 1000);
-  const consultas = await Promise.all(faixas.map(([inicio, fim]) =>
-    db.collection("users")
-        .orderBy("lastLocation.geohash")
-        .startAt(inicio)
-        .endAt(fim)
-        .get()));
-  const porUid = new Map();
-  for (const snap of consultas) {
-    for (const doc of snap.docs) porUid.set(doc.id, {uid: doc.id, ...doc.data()});
+  // 1) Candidatos. Modo de teste: todos os usuários. Normal: só quem tem a
+  //    última localização a até 10 km (faixas de geohash, sem índice composto).
+  const usuarios = new Map();
+  if (ALERTAS_PARA_TODOS) {
+    const snap = await db.collection("users").select(...CAMPOS_ALERTA).get();
+    for (const doc of snap.docs) usuarios.set(doc.id, {uid: doc.id, ...doc.data()});
+  } else {
+    const faixas = geohashQueryBounds(
+        [post.latitude, post.longitude], RAIO_MAXIMO_KM * 1000);
+    const consultas = await Promise.all(faixas.map(([inicio, fim]) =>
+      db.collection("users")
+          .select(...CAMPOS_ALERTA)
+          .orderBy("lastLocation.geohash")
+          .startAt(inicio)
+          .endAt(fim)
+          .get()));
+    for (const snap of consultas) {
+      for (const doc of snap.docs) usuarios.set(doc.id, {uid: doc.id, ...doc.data()});
+    }
   }
 
-  // 2) Filtro exato: distância <= raio de cada um, sem o autor e sem quem
-  //    desligou os alertas.
-  const destinatarios = escolherDestinatarios(post, [...porUid.values()]);
+  // 2) Filtro: normal = distância <= raio de cada um, sem o autor e sem quem
+  //    desligou os alertas; teste = todo mundo.
+  const destinatarios = escolherDestinatarios(post, [...usuarios.values()],
+      {paraTodos: ALERTAS_PARA_TODOS});
   if (destinatarios.length === 0) {
-    logger.info(`Post ${postId}: ninguém por perto para avisar.`);
+    logger.info(`Post ${postId}: ninguém para avisar.`);
     return;
   }
 
-  const {titulo, corpo} = montarMensagem(post);
-
-  // 3) Registro em users/{uid}/notifications (aparece no sino do app).
+  // 3) Registro em users/{uid}/notifications (aparece no sino do app), com a
+  //    mesma mensagem rica do push (e a distância de cada um, quando há).
   for (const lote of emLotes(destinatarios, 400)) {
     const batch = db.batch();
     for (const d of lote) {
+      const {titulo, corpo, imagem} =
+        montarMensagem(post, {distanciaKm: d.distanciaKm, agora});
       batch.set(db.collection("users").doc(d.uid).collection("notifications").doc(), {
         title: titulo,
         body: corpo,
+        image: imagem,
         postId,
         type: post.type,
         read: false,
@@ -92,29 +115,30 @@ exports.alertarProximos = onDocumentCreated("posts/{postId}", async (event) => {
     await batch.commit();
   }
 
-  // 4) Push para quem tem token; remove tokens que não servem mais.
+  // 4) Push (Android e navegador) para quem tem token, uma mensagem por
+  //    pessoa; remove tokens que não servem mais.
   const comToken = destinatarios.filter((d) => d.token);
   let enviados = 0;
   for (const lote of emLotes(comToken, 500)) {
-    const resposta = await getMessaging().sendEachForMulticast({
-      tokens: lote.map((d) => d.token),
-      notification: {title: titulo, body: corpo},
-      data: {postId, type: String(post.type)},
-      android: {priority: "high", notification: {channelId: "alertas_pets"}},
-    });
+    const resposta = await getMessaging().sendEach(lote.map((d) => montarPush({
+      token: d.token, postId, post, distanciaKm: d.distanciaKm, agora, site: SITE,
+    })));
     enviados += resposta.successCount;
     const limpezas = [];
     resposta.responses.forEach((r, i) => {
-      if (!r.success && r.error && tokenInvalido(r.error.code)) {
-        limpezas.push(db.collection("users").doc(lote[i].uid)
-            .update({fcmToken: FieldValue.delete()}));
+      if (!r.success && r.error) {
+        logger.warn(`Push para ${lote[i].uid.slice(0, 6)}… falhou: ${r.error.code}`);
+        if (tokenInvalido(r.error.code)) {
+          limpezas.push(db.collection("users").doc(lote[i].uid)
+              .update({fcmToken: FieldValue.delete()}));
+        }
       }
     });
     await Promise.all(limpezas);
   }
 
   logger.info(`Post ${postId}: ${destinatarios.length} avisados ` +
-    `(${enviados} push enviados).`);
+    `(${enviados} push enviados)${ALERTAS_PARA_TODOS ? " [modo teste: todos]" : ""}.`);
 });
 
 exports.analisarPet = onRequest({

@@ -179,8 +179,26 @@ com fotos. Domínio já autorizado no Firebase Auth. Para atualizar: `flutter bu
   do Firestore. `firebase-functions` 7.4, `firebase-admin` 14.5, `geofire-common` 6.0, Node 22 (o mais
   novo na lista de runtimes do Cloud Functions em 16/10/2026).
 - **Notificações:** só a Function cria (Admin SDK); o dono lê, apaga e muda apenas o campo `read`.
-- **Push na Web e no iOS:** fora do escopo. Na Web o serviço de alertas não roda (precisaria de chave
-  VAPID e service worker); no iOS o push exige chave APNs (conta Apple Developer).
+- **Notificação rica (23/10/2026):** título com tipo, nome e espécie/cor; linhas com bairro, quando
+  (Brasília, "hoje/ontem") e distância, porte/raça/características e o começo da descrição; foto do
+  post (Android e navegador). Lógica pura em `functions/alertas.js` (`montarMensagem`,
+  `montarPush`), testada. O sino do app mostra a foto e o texto completo.
+- **Modo de teste dos alertas:** `functions/.env` com `ALERTAS_PARA_TODOS=true` → todo post novo
+  avisa TODOS os usuários (com documento em `users`), inclusive o autor, sem olhar a distância.
+  Para voltar ao geofencing: `false` e `firebase deploy --only functions`.
+- **Push no navegador (23/10/2026):** `web/firebase-messaging-sw.js` (SDK 11.9.1, igual ao do
+  `firebase_core_web`) pega a configuração do próprio Hosting (`/__/firebase/init.js`), sem chave
+  no arquivo; token com a chave VAPID padrão do Firebase. Funciona no Chrome/Edge/Firefox (Android e
+  computador); no iPhone só com o site adicionado à tela de início; não funciona em `flutter run`
+  local (sem `/__/firebase/init.js`). O toque abre o site com `?post=<id>`, e o app abre o post.
+  Limitação: um token por usuário (o último aparelho/navegador que abriu o app).
+- **Push no iOS (app):** fora do escopo (exige chave APNs / conta Apple Developer).
+- **Localização pedida dentro do app (23/10/2026):** toda vez que o app abre e a permissão não está
+  liberada, um aviso explica para que serve antes do pedido do sistema/navegador ("Agora não"
+  adia); se estiver bloqueada, explica o caminho (configurações do app ou cadeado do navegador).
+- **Pinos do mapa na Web:** o plugin da Web ignora a cor dos pinos padrão; os pinos são desenhados
+  pelo app (`IconesMapa`) nas cores da legenda.
+- **Aviso "Há N pets perdidos":** tocável — filtra só os perdidos e enquadra o mapa neles.
 - Ao sair da conta, o `fcmToken` é apagado do `users/{uid}` (o aparelho para de receber os alertas
   daquela conta).
 - **Pontos — "uma vez só":** cada ganho usa um id fixo no `pointsLog` (`post_<id>`, `euvi_<id>`); a
