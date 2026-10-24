@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:typed_data';
-import 'package:firebase_ai/firebase_ai.dart' show FirebaseAIException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:petperdido/core/pet_options.dart';
@@ -109,27 +108,32 @@ void main() {
     });
   });
 
-  group('AIService.mensagemDeErro', () {
-    test('tempo esgotado, cota, API desativada, outros e sem internet', () {
+  group('AIService: mensagens de erro', () {
+    test('tempo esgotado e sem internet', () {
       expect(AIService.mensagemDeErro(TimeoutException('x')), contains('demorou'));
-      expect(
-          AIService.mensagemDeErro(
-              FirebaseAIException('Quota exceeded for quota metric')),
-          contains('limite'));
-      expect(
-          AIService.mensagemDeErro(FirebaseAIException(
-              'Firebase AI Logic API (firebasevertexai.googleapis.com) has not been used')),
-          contains('não foi ativada'));
-      expect(AIService.mensagemDeErro(FirebaseAIException('erro 500')),
-          contains('não conseguiu responder'));
-      // 429 do Gemini quando os créditos pré-pagos do projeto acabam.
-      expect(
-          AIService.mensagemDeErro(FirebaseAIException(
-              'Your prepayment credits are depleted. Please go to AI Studio '
-              'to manage your project and billing.')),
-          contains('limite de uso do projeto'));
       expect(AIService.mensagemDeErro(Exception('SocketException')),
           contains('sem internet'));
+    });
+
+    test('respostas da Function', () {
+      expect(AIService.mensagemDoStatus(401), contains('Entre de novo'));
+      expect(AIService.mensagemDoStatus(429), contains('limite de uso gratuito'));
+      expect(AIService.mensagemDoStatus(400), contains('Tente outra foto'));
+      expect(AIService.mensagemDoStatus(502), contains('não conseguiu responder'));
+    });
+  });
+
+  group('AIService.opcoes (o que a Function aceita na resposta)', () {
+    test('mesmas listas do formulário', () {
+      final o = AIService.opcoes;
+      expect(o['especies'], PetOptions.especies.keys.toList());
+      expect(o['cores'], PetOptions.cores.keys.toList());
+      expect(o['caracteristicas'], PetOptions.caracteristicas);
+      // Limites da Function (functions/ia.js): até 60 opções de até 40 letras.
+      for (final lista in o.values) {
+        expect(lista.length, inInclusiveRange(1, 60));
+        expect(lista.every((x) => x.isNotEmpty && x.length <= 40), isTrue);
+      }
     });
   });
 

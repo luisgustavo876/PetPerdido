@@ -15,7 +15,7 @@ Firestore e do Storage publicadas e validadas por REST (inclusive a de avistamen
 |---|---|---|
 | — | 0 Limpeza · 1 Regras · 2 Login/Cadastro · 3 Criar Post | ✅ Feito |
 | 1 | 4 Mapa · 5 Feed · 6 Detalhe | ✅ Feito |
-| 2 | IA (Gemini) | ✅ Código pronto · ⏸️ **você** ativa o AI Logic no console |
+| 2 | IA (Gemini) | ✅ Código pronto (Function `analisarPet`) · ⏸️ chave gratuita + deploy da Function |
 | 3 | Geofencing + Push | ✅ Function publicada (16/10) e testada ponta a ponta |
 | 4 | 7 Pontos e recompensas | ✅ Feito |
 | 5 | 8 Chat | ✅ Feito (TTL publicado por código) |
@@ -137,18 +137,23 @@ com fotos. Domínio já autorizado no Firebase Auth. Para atualizar: `flutter bu
 - Regras: publico com `firebase deploy --only firestore:rules` (após `--dry-run`) e valido logo em
   seguida por REST com 2 usuários de teste; tudo é apagado no fim.
 - Build Android: se aparecer `mergeExtDexDebug` falhando, rodar de novo (erro passageiro do Gradle).
-- **IA — pacote:** `firebase_ai` 2.3.0, a versão compatível com os pacotes Firebase atuais
-  (`firebase_core` 3.15). A versão mais nova (5.0.0, publicada em 15/10/2026) exigiria atualizar todos
-  os pacotes Firebase em duas versões principais a poucos dias da entrega; fica como melhoria futura.
-- **IA — modelo:** `gemini-3.5-flash` (constante `AppConstants.geminiModel`). Pela documentação do
-  Firebase AI Logic (consultada em 16/10/2026), os Flash 3.6/3.7/3.8 são estáveis porém de
-  "disponibilidade de curto prazo"; o 3.5 Flash tem disponibilidade garantida até pelo menos 05/2027.
-  Para trocar, basta mudar a constante.
+- **IA — de AI Logic para Cloud Function (23/10/2026):** o projeto está no Blaze (exigido pela
+  Function de alertas), então a Gemini API dele saiu do nível gratuito e passou a usar créditos
+  pré-pagos, que acabaram (erro 429 "prepayment credits are depleted"). O nível gratuito só vale para
+  projetos sem faturamento. Solução sem custo: chave criada no AI Studio num **projeto separado, sem
+  faturamento**, guardada no segredo `GEMINI_API_KEY` do Firebase; a Function `analisarPet` (HTTPS,
+  só usuário logado, CORS só dos domínios do app) chama o Gemini. O app saiu do `firebase_ai` e
+  chama a Function com o pacote `http` (sem biblioteca Android nova).
+- **IA — modelos:** lista em `functions/ia.js` (`gemini-3.6-flash`, `3.8-flash`, `3.5-flash-lite`,
+  `2.5-flash`); em 429 (limite gratuito daquele modelo) ou 404 tenta o próximo. As listas de valores
+  permitidos vão do app para a Function (uma fonte só: `PetOptions`).
+- **IA — nível gratuito:** tem limite diário por modelo e o Google pode usar o conteúdo enviado para
+  melhorar os produtos; avisado na tela e na Política de Privacidade.
 - **IA — dados:** a foto é reduzida (máx. 1024 px, JPEG 80) antes de enviar. O prompt manda ignorar
   pessoas e responder "Indefinido" sem cão/gato. A resposta só é aceita com valores das listas do app
   (espécie, porte, até 2 cores, características); raça limitada a 40 caracteres.
-- O pacote `firebase_ai` só exporta a classe base de erro; o tipo (cota, API desativada) é reconhecido
-  pela mensagem em `AIService.mensagemDeErro` (testada).
+- Erros da IA: `AIService.mensagemDoStatus` (401, 429, 400, outros) e `mensagemDeErro` (tempo,
+  internet), testadas.
 - **Geofencing — consentimento:** `alertsEnabled` só é gravado depois do aviso de LGPD (aceitou = true,
   "Agora não" = false). Sem resposta (campo ausente) o app pergunta ao abrir. Assim ninguém recebe
   alertas nem tem a localização guardada sem ter concordado. O raio padrão é 3 km.
@@ -213,15 +218,13 @@ build no Artifact Registry (região southamerica-east1). Sem ela, cada novo depl
 `firebase functions:artifacts:setpolicy --location southamerica-east1`
 (ou, no próximo deploy, `firebase deploy --only functions --force`).
 
-### 2. Ativar o Firebase AI Logic (necessário para "Preencher com IA")
-Hoje a API responde 403 "Firebase AI Logic API has not been used ... or it is disabled".
-1. Abra https://console.firebase.google.com/project/petperdido-ff844 e entre com a conta do projeto.
-2. No menu da esquerda, abra **AI Logic** (fica em "Criar" / "Build", às vezes listado como "AI").
-3. Clique em **Começar** ("Get started").
-4. Escolha **Gemini Developer API** (não a "Vertex AI Gemini API") e confirme em **Ativar API**
-   ("Enable API"). O console cria e gerencia a chave sozinho — não coloque chave nenhuma no app.
-5. Se aparecer a sugestão de ativar o App Check, pode pular por enquanto (recomendado só em produção).
-6. Espere uns 5 minutos e teste: Criar postagem → foto de cão ou gato → **Preencher com IA**.
+### 2. Chave gratuita da IA (necessária para "Preencher com IA")
+1. Em https://aistudio.google.com/apikey → **Criar chave de API** → num **projeto novo** (ex.:
+   "PetPerdido IA"), **sem faturamento** (plano "Free"). Nunca no `petperdido-ff844`.
+2. No terminal, na pasta do projeto: `firebase functions:secrets:set GEMINI_API_KEY` e cole a chave
+   (se pedir para ativar o Secret Manager, responda Y).
+3. Deploy da Function: `firebase deploy --only functions` (pedir autorização antes).
+4. Teste: Criar postagem → foto de cão ou gato → **Preencher com IA**.
 
 ### 3. ~~Criar a política TTL das mensagens do chat~~ — feito por código (16/10/2026)
 `firestore.indexes.json` tem um `fieldOverrides` com `ttl: true` em `messages.expireAt` (mantendo os
@@ -272,7 +275,7 @@ no Chrome em `flutter run -d web-server --web-port 8080`).
    permita notificações e localização. Com a outra conta, crie um post a menos de 3 km → chega "Pet perdido perto de você"; tocar abre o post; com o app aberto
    aparece um banner; o sino mostra o alerta.
 3. **Criar post (Módulo 3 + IA):** Mapa → Criar postagem → "Perdi" → foto (câmera ou galeria) →
-   **Preencher com IA** (após ativar o AI Logic) → confira o selo "Sugerido pela IA" → marque o ponto
+   **Preencher com IA** (após a chave gratuita e o deploy da Function) → confira o selo "Sugerido pela IA" → marque o ponto
    no mapa (o bairro aparece sozinho) → revisão com "Possíveis correspondências" → Publicar.
 4. **Mapa (Módulo 4):** marcadores por cor; toque → resumo → "Ver detalhes"; Filtros (tipo, espécie,
    período, resolvidos); botão satélite; "Minha localização".

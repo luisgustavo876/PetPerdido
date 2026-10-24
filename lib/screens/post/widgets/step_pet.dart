@@ -76,8 +76,9 @@ class StepPet extends StatelessWidget {
           BotaoIA(
             rotulo: 'Preencher a partir da descrição',
             avisoPrivacidade:
-                'A descrição é enviada à IA do Google (Gemini) só para '
-                'identificar espécie, porte, cor e raça.',
+                'A descrição é enviada à IA do Google (Gemini) para identificar '
+                'espécie, porte, cor e raça (nível gratuito: o Google pode usá-la '
+                'para melhorar o serviço). Não escreva dados pessoais.',
             mensagemSucesso: 'Pronto! Confira os campos marcados acima.',
             analisar: () {
               final texto = draft.descriptionController.text.trim();

@@ -33,7 +33,8 @@ implementado** (outubro de 2026). Cada seção pode ser adaptada para o capítul
 ```
 
 - **Cliente:** Flutter 3.41 / Dart 3.11, um único código para Android, Web e iOS.
-- **Backend sem servidor próprio:** Firebase (Auth, Firestore, Storage, FCM, Functions, AI Logic).
+- **Backend sem servidor próprio:** Firebase (Auth, Firestore, Storage, FCM, Functions, Hosting) e
+  Gemini API (chamada pela Cloud Function `analisarPet`).
 - **Padrão de código:** camadas `screens → services → Firebase`; regras de negócio em funções puras
   (testadas sem Firebase). Sem gerenciador de estado, para manter o código acessível ao time.
 - **Consultas sem índice composto:** a lista principal lê os 100 posts mais recentes por `createdAt`
@@ -101,8 +102,11 @@ bairro (ex.: "Cão caramelo e branco · Vila Barth, Itapetininga").
 1. Na etapa Foto do cadastro do post, o usuário toca em **"Preencher com IA"** (ou, em "Avistei" sem
    foto, em "Preencher a partir da descrição").
 2. A foto é **reduzida para no máximo 1024 px** (JPEG) no aparelho.
-3. O app chama o **Firebase AI Logic** (Gemini Developer API, modelo `gemini-3.5-flash`): a chave fica
-   no Firebase, **não no app**.
+3. O app chama a **Cloud Function `analisarPet`** (HTTPS) com o token do usuário logado e as listas de
+   valores permitidos. A Function confere o login e o tamanho da foto e chama a **Gemini API** (modelos
+   Flash, no nível gratuito de um projeto separado e sem faturamento). A chave do Gemini fica num
+   **segredo do Firebase** (Secret Manager), **nunca no app**. Se um modelo atingir o limite gratuito
+   (429), a Function tenta o próximo da lista.
 4. A resposta é **JSON estruturado** (`responseSchema`) com valores restritos às listas do app:
    espécie (Cão/Gato/Indefinido), porte, até 2 cores, raça curta e características.
 5. O prompt manda **ignorar pessoas** e responder "Indefinido" se não houver cão ou gato.

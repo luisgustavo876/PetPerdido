@@ -38,7 +38,8 @@ a partir da foto.
 
 - **Flutter 3.41 / Dart 3.11** — Android (alvo principal), Web (Chrome) e iOS (sem push)
 - **Firebase:** Authentication, Cloud Firestore, Storage, Cloud Messaging, Cloud Functions
-  (Node 22, região `southamerica-east1`) e **AI Logic** (Gemini `gemini-3.5-flash`)
+  (Node 22, região `southamerica-east1`: alertas e `analisarPet`, que chama o **Gemini** com a
+  chave num segredo do Firebase) e Hosting (versão Web)
 - **Mapas e localização:** Google Maps (`google_maps_flutter`), `geolocator`, `geocoding` e
   Nominatim/OpenStreetMap (fallback, inclusive na Web), geohash (`dart_geohash` / `geofire-common`)
 - Sem gerenciador de estado: services com métodos `static`, `StatefulWidget` + `StreamBuilder`

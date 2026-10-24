@@ -105,8 +105,9 @@ class StepFoto extends StatelessWidget {
             key: ValueKey(bytes.hashCode),
             rotulo: 'Preencher com IA',
             avisoPrivacidade:
-                'A foto é enviada à IA do Google (Gemini) só para identificar '
-                'espécie, porte, cor e raça.',
+                'A foto é enviada à IA do Google (Gemini) para identificar '
+                'espécie, porte, cor e raça (nível gratuito: o Google pode usá-la '
+                'para melhorar o serviço). Evite pessoas na foto.',
             mensagemSucesso:
                 'Pronto! As sugestões já estão na próxima etapa. Confira e ajuste.',
             analisar: () => AIService.analisarFoto(bytes),

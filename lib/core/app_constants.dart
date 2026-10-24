@@ -27,10 +27,10 @@ class AppConstants {
   /// Evita expor a localização exata de quem publica (LGPD).
   static const int coordDecimals = 3;
 
-  // IA (Firebase AI Logic + Gemini Developer API).
-  // 3.5 Flash: estável com disponibilidade garantida até pelo menos 05/2027
-  // (os Flash mais novos são "short-term availability").
-  static const String geminiModel = 'gemini-3.5-flash';
+  // IA (Gemini) pela Cloud Function `analisarPet` (a chave fica num segredo
+  // do Firebase; o modelo é escolhido em functions/ia.js).
+  static const String iaUrl =
+      'https://southamerica-east1-petperdido-ff844.cloudfunctions.net/analisarPet';
   static const int iaMaxPixels = 1024;
 
   // Fotos enviadas ao Storage: sem recorte, no máximo 1600 px no lado maior,

@@ -1,10 +1,12 @@
 import 'dart:async';
-import 'package:firebase_ai/firebase_ai.dart';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import '../core/app_constants.dart';
 import '../core/pet_options.dart';
 import '../models/sugestao_ia.dart';
+import 'auth_service.dart';
 
 /// Erro da IA com mensagem pronta para mostrar ao usuário.
 class IAException implements Exception {
@@ -15,73 +17,62 @@ class IAException implements Exception {
   String toString() => mensagem;
 }
 
-/// Extração de metadados do pet (espécie, porte, cor...) com o Gemini, pelo
-/// Firebase AI Logic. A chamada passa pelo Firebase: o app não tem chave.
+/// Extração de metadados do pet (espécie, porte, cor...) com o Gemini.
+///
+/// O app chama a Cloud Function `analisarPet` (HTTPS, com o token do usuário
+/// logado); a Function guarda a chave do Gemini num segredo do Firebase e
+/// monta as instruções e o esquema da resposta. O app não tem chave nenhuma.
 class AIService {
-  static const _timeout = Duration(seconds: 30);
-
-  static const _instrucoes = '''
-Você ajuda um app de pets perdidos a descrever animais.
-Analise somente o animal principal (cão ou gato). Ignore pessoas, roupas,
-placas, textos e o fundo. Nunca descreva pessoas.
-Se não houver cão nem gato, responda species "Indefinido" e deixe as listas vazias.
-Use apenas os valores permitidos no esquema. Para cores, escolha no máximo 2
-das opções. Para a raça, um nome curto em português ou "Sem raça definida"
-se for mestiço ou incerto. Para características, só as que forem visíveis
-(ou citadas, no caso de texto).''';
-
-  static GenerativeModel get _modelo => FirebaseAI.googleAI().generativeModel(
-        model: AppConstants.geminiModel,
-        systemInstruction: Content.system(_instrucoes),
-        generationConfig: GenerationConfig(
-          responseMimeType: 'application/json',
-          responseSchema: _esquema,
-          temperature: 0.2,
-        ),
-      );
-
-  /// Saída estruturada: só valores das listas do app.
-  static final _esquema = Schema.object(
-    properties: {
-      'species': Schema.enumString(
-          enumValues: [...PetOptions.especies.keys, 'Indefinido']),
-      'size': Schema.enumString(enumValues: PetOptions.portes.keys.toList()),
-      'colors': Schema.array(
-        items: Schema.enumString(enumValues: PetOptions.cores.keys.toList()),
-        description: 'No máximo 2 cores.',
-      ),
-      'breed': Schema.string(description: 'Raça curta ou "Sem raça definida".'),
-      'traits': Schema.array(
-        items: Schema.enumString(enumValues: PetOptions.caracteristicas),
-      ),
-    },
-  );
+  static const _timeout = Duration(seconds: 45);
 
   /// Analisa a foto do pet. Lança [IAException] com a mensagem para o usuário.
   static Future<SugestaoIA> analisarFoto(Uint8List foto) async {
     final reduzida = await compute(reduzirFoto, foto);
-    return _gerar(Content.multi([
-      TextPart('Descreva o pet desta foto.'),
-      InlineDataPart('image/jpeg', reduzida),
-    ]));
+    return _gerar({'imagem': base64Encode(reduzida), 'mime': 'image/jpeg'});
   }
 
   /// Analisa a descrição digitada (ex.: Avistei sem foto).
-  static Future<SugestaoIA> analisarDescricao(String descricao) {
-    return _gerar(Content.text(
-        'Extraia os dados do pet a partir desta descrição: "$descricao"'));
-  }
+  static Future<SugestaoIA> analisarDescricao(String descricao) =>
+      _gerar({'descricao': descricao});
 
-  static Future<SugestaoIA> _gerar(Content conteudo) async {
-    final GenerateContentResponse resposta;
+  static Future<SugestaoIA> _gerar(Map<String, Object> pedido) async {
+    final usuario = AuthService.currentUser;
+    if (usuario == null) {
+      throw const IAException('Entre na sua conta para usar a IA.');
+    }
+
+    final http.Response resposta;
     try {
-      resposta = await _modelo.generateContent([conteudo]).timeout(_timeout);
+      final token = await usuario.getIdToken();
+      resposta = await http
+          .post(
+            Uri.parse(AppConstants.iaUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({...pedido, 'opcoes': opcoes}),
+          )
+          .timeout(_timeout);
     } catch (e) {
-      debugPrint('AIService: falha ao gerar: $e');
+      debugPrint('AIService: falha ao chamar a IA: $e');
       throw IAException(mensagemDeErro(e));
     }
 
-    final sugestao = SugestaoIA.converter(resposta.text);
+    if (resposta.statusCode != 200) {
+      debugPrint('AIService: a IA respondeu ${resposta.statusCode}: '
+          '${resposta.body}');
+      throw IAException(mensagemDoStatus(resposta.statusCode));
+    }
+
+    String? texto;
+    try {
+      texto = (jsonDecode(resposta.body) as Map<String, dynamic>)['texto']
+          as String?;
+    } catch (_) {
+      texto = null;
+    }
+    final sugestao = SugestaoIA.converter(texto);
     if (sugestao == null) {
       throw const IAException(
           'A IA não conseguiu identificar o pet. Preencha manualmente.');
@@ -93,35 +84,29 @@ se for mestiço ou incerto. Para características, só as que forem visíveis
     return sugestao;
   }
 
-  /// Mensagem para o usuário conforme o erro da chamada à IA. Função pura.
-  /// (O pacote só exporta a classe base FirebaseAIException; o tipo do erro
-  /// — cota, API desativada — é reconhecido pela mensagem.)
+  /// Valores permitidos na resposta (a Function monta o esquema com eles).
+  static Map<String, List<String>> get opcoes => {
+        'especies': PetOptions.especies.keys.toList(),
+        'portes': PetOptions.portes.keys.toList(),
+        'cores': PetOptions.cores.keys.toList(),
+        'caracteristicas': PetOptions.caracteristicas,
+      };
+
+  /// Mensagem para o usuário conforme a resposta da Function. Função pura.
+  static String mensagemDoStatus(int status) => switch (status) {
+        401 => 'Entre de novo na sua conta para usar a IA.',
+        429 => 'A IA atingiu o limite de uso gratuito por agora. '
+            'Tente mais tarde ou preencha manualmente.',
+        400 || 413 => 'Não foi possível enviar isso para a IA. '
+            'Tente outra foto ou preencha manualmente.',
+        _ => 'A IA não conseguiu responder agora. '
+            'Tente de novo ou preencha manualmente.',
+      };
+
+  /// Mensagem para falhas antes da resposta (tempo, internet). Função pura.
   static String mensagemDeErro(Object erro) {
     if (erro is TimeoutException) {
       return 'A IA demorou para responder. Confira a internet e tente de novo.';
-    }
-    if (erro is FirebaseAIException) {
-      final msg = erro.message.toLowerCase();
-      // Créditos pré-pagos do projeto acabaram / cobrança (erro 429 do Gemini).
-      if (msg.contains('credits') ||
-          msg.contains('prepay') ||
-          msg.contains('billing')) {
-        return 'A IA está indisponível no momento (limite de uso do projeto). '
-            'Preencha manualmente.';
-      }
-      if (msg.contains('quota') ||
-          msg.contains('exhausted') ||
-          msg.contains('rate limit')) {
-        return 'O limite de uso da IA foi atingido. Tente mais tarde ou preencha manualmente.';
-      }
-      if (msg.contains('firebasevertexai') ||
-          msg.contains('firebaseml') ||
-          msg.contains('not been used') ||
-          msg.contains('to be enabled') ||
-          msg.contains('is disabled')) {
-        return 'A IA ainda não foi ativada neste projeto. Preencha manualmente.';
-      }
-      return 'A IA não conseguiu responder agora. Tente de novo ou preencha manualmente.';
     }
     return 'Não foi possível usar a IA agora (sem internet?). Preencha manualmente.';
   }

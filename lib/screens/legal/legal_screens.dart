@@ -66,7 +66,9 @@ class PrivacidadeScreen extends StatelessWidget {
         ('Serviços de terceiros',
             'Usamos o Firebase (Google) para cadastro, banco de dados, fotos, notificações '
                 'e funções na nuvem. Quando você toca em "Preencher com IA", a foto ou a '
-                'descrição é enviada à IA Gemini (Google) só para identificar o pet. Para '
+                'descrição é enviada à IA Gemini (Google) só para identificar o pet; como o '
+                'protótipo usa o nível gratuito do Gemini, o Google pode usar esse conteúdo '
+                'para melhorar os produtos dele (por isso, não fotografe pessoas). Para '
                 'achar o nome do bairro usamos o geocoding do aparelho ou o OpenStreetMap '
                 '(Nominatim), enviando apenas coordenadas.'),
         ('Por quanto tempo guardamos',
