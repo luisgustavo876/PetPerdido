@@ -19,3 +19,18 @@ try {
 } catch (e) {
   console.warn('PetPerdido: push do navegador indisponível aqui.', e);
 }
+
+// Botões da notificação ("Ver o pet" / "Ver no mapa"). O toque no corpo da
+// notificação o próprio Firebase trata (abre o link do post); aqui só os
+// botões. (As abas do site não são controladas por este service worker, que
+// tem escopo próprio; por isso abre o endereço em vez de navegar a aba.)
+self.addEventListener('notificationclick', (event) => {
+  if (!event.action) return;
+  event.notification.close();
+  const msg = (event.notification.data || {}).FCM_MSG || {};
+  const postId = msg.data && msg.data.postId;
+  const destino = event.action === 'ver' && postId
+    ? '/?post=' + encodeURIComponent(postId)
+    : '/';
+  event.waitUntil(clients.openWindow(new URL(destino, self.location.origin).href));
+});

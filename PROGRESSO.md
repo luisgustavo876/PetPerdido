@@ -10,14 +10,21 @@ Branch: `refactor/modulo-0-limpeza` (enviada ao GitHub, sem merge). Prazo: 28/10
 A notificação tem que chegar **no celular da pessoa, como notificação do sistema** (barra de
 notificações, com a foto), e não só dentro do app (sino/banner).
 
-- **Pronto e commitado** (`fe5ea65`), mas a Function **ainda não foi publicada**:
+- **26/10/2026: Function publicada** (com autorização; `alertarProximos` ACTIVE, `ALERTAS_PARA_TODOS=true`)
+  e **push estilizado**: ícone do app (pata branca no vermelho, no lugar do logo do Flutter), selo da
+  pata na barra de status, foto grande, botões "Ver o pet" / "Ver no mapa", vibração (perdido vibra
+  mais e fica na tela até tocar), cor do app no navegador; no app Android, pata branca e vermelho
+  (`ic_notification`, `default_notification_color`). Ícones gerados por `tool/gerar_icones_test.dart`.
+  **Atenção:** a rede do PC bloqueia `fcm.googleapis.com` (e `dl.google.com`); se o celular estiver
+  no mesmo Wi-Fi e o push não chegar, testar com dados móveis.
+- **Pronto e commitado** (`fe5ea65`):
   - `alertarProximos` com a mensagem rica (foto, onde/quando/distância, porte/raça/características,
     começo da descrição) e o **modo de teste** `ALERTAS_PARA_TODOS=true` em `functions/.env` (todo post
     novo avisa todos os usuários, inclusive o autor);
   - push no navegador: `web/firebase-messaging-sw.js` + `AlertaService` na Web — **o site já está
     publicado com esse código**.
 - **Falta:**
-  1. Autorização do usuário para `firebase deploy --only functions` (pedir antes).
+  1. ~~Autorização para `firebase deploy --only functions`~~ — publicada em 26/10/2026.
   2. Teste no celular: abrir https://petperdido-ff844.web.app, recarregar, "Ativar alertas" (ou
      Configurações → Receber alertas), permitir notificações, criar um post com foto → deve chegar a
      notificação **na barra do celular**, com a foto (com o site fechado ou em segundo plano).

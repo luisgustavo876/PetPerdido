@@ -26,6 +26,9 @@ const MAX_TRECHO = 100;
 /** Fuso das datas mostradas (o servidor roda em UTC). */
 const FUSO = "America/Sao_Paulo";
 
+/** Vermelho do app (AppColors.primary), usado na notificação do Android. */
+const COR_APP = "#E53935";
+
 /** Distância em linha reta entre dois pontos, em km (Haversine). */
 function distanciaKm(lat1, lng1, lat2, lng2) {
   const rad = (g) => (g * Math.PI) / 180;
@@ -177,20 +180,45 @@ function montarMensagem(post, {distanciaKm: km = null, agora = new Date()} = {})
 function montarPush({token, postId, post, distanciaKm: km = null,
   agora = new Date(), site}) {
   const {titulo, corpo, imagem} = montarMensagem(post, {distanciaKm: km, agora});
+  // Pet perdido é urgente: vibra mais e fica na tela até a pessoa tocar.
+  const urgente = post.type === "perdi";
   return {
     token,
     notification: {title: titulo, body: corpo, ...(imagem ? {imageUrl: imagem} : {})},
     data: {postId, type: String(post.type), ...(imagem ? {imagem} : {})},
+    // App Android: pata branca na barra de status, vermelho do app, som e
+    // conteúdo visível na tela bloqueada (só dados públicos do post).
     android: {
       priority: "high",
-      notification: {channelId: "alertas_pets", tag: postId},
+      notification: {
+        channelId: "alertas_pets",
+        tag: postId,
+        icon: "ic_notification",
+        color: COR_APP,
+        defaultSound: true,
+        visibility: "public",
+        priority: "high",
+      },
     },
+    // Navegador (Chrome/Edge/Firefox): foto grande, ícone do app, selo da
+    // pata, botões e vibração. A mesma notificação é trocada, não repetida.
     webpush: {
+      headers: {Urgency: "high", TTL: String(24 * 60 * 60)},
       notification: {
         title: titulo,
         body: corpo,
+        lang: "pt-BR",
         icon: `${site}/icons/Icon-192.png`,
+        badge: `${site}/icons/badge-96.png`,
         ...(imagem ? {image: imagem} : {}),
+        tag: postId,
+        renotify: true,
+        requireInteraction: urgente,
+        vibrate: urgente ? [300, 120, 300, 120, 300] : [200, 100, 200],
+        actions: [
+          {action: "ver", title: "Ver o pet"},
+          {action: "mapa", title: "Ver no mapa"},
+        ],
       },
       fcmOptions: {link: `${site}/?post=${encodeURIComponent(postId)}`},
     },

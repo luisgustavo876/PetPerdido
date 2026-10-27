@@ -183,6 +183,30 @@ test("montarPush: foto no Android e no navegador, link do post e dados", () => {
   assert.equal(semFoto.data.imagem, undefined);
 });
 
+test("montarPush: visual (ícones, cor, botões, vibração e urgência)", () => {
+  const site = "https://petperdido-ff844.web.app";
+  const p = montarPush({token: "t", postId: "p1", post, agora: AGORA, site});
+  // App Android: pata branca e vermelho do app, visível na tela bloqueada.
+  assert.equal(p.android.notification.icon, "ic_notification");
+  assert.equal(p.android.notification.color, "#E53935");
+  assert.equal(p.android.notification.visibility, "public");
+  // Navegador: ícone do app, selo da pata, botões e troca (não repete).
+  const w = p.webpush.notification;
+  assert.equal(w.icon, `${site}/icons/Icon-192.png`);
+  assert.equal(w.badge, `${site}/icons/badge-96.png`);
+  assert.deepEqual(w.actions.map((a) => a.action), ["ver", "mapa"]);
+  assert.equal(w.tag, "p1");
+  assert.equal(w.renotify, true);
+  assert.equal(w.lang, "pt-BR");
+  assert.equal(p.webpush.headers.Urgency, "high");
+  // Perdido é urgente: fica na tela e vibra mais; achado/avistado não.
+  assert.equal(w.requireInteraction, true);
+  const achei = montarPush({token: "t", postId: "p2", post: {...post, type: "achei"},
+    agora: AGORA, site}).webpush.notification;
+  assert.equal(achei.requireInteraction, false);
+  assert.ok(achei.vibrate.length < w.vibrate.length);
+});
+
 test("tokenInvalido e emLotes", () => {
   assert.ok(tokenInvalido("messaging/registration-token-not-registered"));
   assert.ok(!tokenInvalido("messaging/internal-error"));

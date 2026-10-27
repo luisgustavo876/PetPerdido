@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Vermelho do app (AppColors.primary): cor da pata nas notificações -->
+    <color name="petperdido_vermelho">#E53935</color>
+</resources>
